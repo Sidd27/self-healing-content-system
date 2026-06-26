@@ -57,7 +57,10 @@ export async function runPipeline(
       repairDecisionStage(runId)
     )
 
-    if (paused) return
+    if (paused) {
+      await skipStage(runId, 'generate')
+      return
+    }
 
     // auto_applied drift items + any first-run topics in same pass
     await runStage(runId, 'generate', () =>
