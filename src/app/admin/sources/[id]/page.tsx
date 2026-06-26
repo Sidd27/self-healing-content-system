@@ -82,13 +82,18 @@ export default function SourceDetailPage() {
         return
       }
       const { runId } = (await res.json()) as { runId: string }
-      router.push(`/admin/runs/${runId}`)
+      router.push(`/admin/pipeline/${runId}`)
     } else {
       setRunning(true)
       const res = await fetch(`/api/sources/${id}/pipeline`, { method: 'POST' })
       setRunning(false)
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string }
+        setFileError(json.error ?? 'Pipeline trigger failed.')
+        return
+      }
       const { runId } = (await res.json()) as { runId: string }
-      router.push(`/admin/runs/${runId}`)
+      router.push(`/admin/pipeline/${runId}`)
     }
   }
 
