@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Self-Healing Content System
 
-## Getting Started
+A system that keeps AI-generated learning content accurate as source materials change.
 
-First, run the development server:
+## Tech Stack
+- Next.js 15 (App Router) + TypeScript
+- Drizzle ORM + Supabase (Postgres)
+- OpenRouter AI (Gemini 2.0 Flash)
+- Shadcn/ui + Tailwind CSS
+- Vercel deployment
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Setup
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Clone the repo
+2. Install dependencies: `npm install`
+3. Copy `.env.local.example` to `.env.local` and fill in:
+   - `DATABASE_URL` — Supabase Postgres connection string
+   - `OPENROUTER_API_KEY` — OpenRouter API key
+4. Run database migrations: `npx drizzle-kit migrate`
+5. Start dev server: `npm run dev`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Architecture
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See `docs/superpowers/specs/2026-06-26-self-healing-content-system-design.md` for full design.
 
-## Learn More
+### Pipeline stages
+1. **Ingest** — fetch/extract content from URL, PDF, or Markdown
+2. **Normalize** — clean text, compute MD5 hash
+3. **Hash Check** — compare with previous version, stop if unchanged
+4. **Extract Topics** — LLM extracts verbatim passages per topic (temp=0)
+5. **Drift Analysis** — LLM scores how much each topic's content changed
+6. **Repair Decision** — auto-apply low/medium drift; gate high drift for human review
+7. **Generate** — LLM generates question + rationale + lesson for changed topics
 
-To learn more about Next.js, take a look at the following resources:
+### Human review
+- Drift score ≥ 0.75 → requires human approval before regenerating
+- New content sections → proposed topics require human approval
+- Review queue at `/admin/review`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## UI
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Admin
+- `/admin/sources` — manage sources, trigger pipeline
+- `/admin/pipeline/[runId]` — live pipeline progress
+- `/admin/review` — approve/reject high-drift items and proposed topics
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Learner
+- `/learner/topics` — browse topics grouped by source
+- `/learner/topics/[topicId]` — view learning unit with progressive reveal
