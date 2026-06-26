@@ -23,8 +23,8 @@ export async function POST(
     await db.update(driftItems).set({ status: 'approved' }).where(eq(driftItems.id, id))
 
     const [run] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.id, item.pipelineRunId))
-    if (!run.sourceVersionId) {
-      return NextResponse.json({ error: 'Run has no source version' }, { status: 500 })
+    if (!run || !run.sourceVersionId) {
+      return NextResponse.json({ error: 'Run not found or has no source version' }, { status: 500 })
     }
     await generateForTopic(item.topicId, run.sourceVersionId, item.driftScore)
 
