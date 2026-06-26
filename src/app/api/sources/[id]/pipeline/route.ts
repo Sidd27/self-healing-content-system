@@ -14,14 +14,8 @@ export async function POST(
   const [source] = await db.select().from(sources).where(eq(sources.id, id))
   if (!source) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Create the pipeline_run row with status 'running'
-  const [run] = await db
-    .insert(pipelineRuns)
-    .values({ sourceId: id, status: 'running', triggeredAt: new Date() })
-    .returning()
-
   if (source.type === 'pdf' || source.type === 'md') {
-    // Accept multipart form data for file-based sources
+    // Validate file BEFORE creating the run to avoid orphaned rows
     const formData = await req.formData()
     const fileEntry = formData.get('file')
 
@@ -34,12 +28,25 @@ export async function POST(
     const type = source.type as 'pdf' | 'md'
     const content = type === 'md' ? buffer.toString('utf-8') : undefined
 
+    // Insert pipeline_run after validation succeeds
+    const [run] = await db
+      .insert(pipelineRuns)
+      .values({ sourceId: id, status: 'running', triggeredAt: new Date() })
+      .returning()
+
     // Fire and forget
     runPipeline(run.id, id, { buffer, type, content }).catch(console.error)
-  } else {
-    // URL source — no file needed
-    runPipeline(run.id, id).catch(console.error)
-  }
 
-  return NextResponse.json({ runId: run.id }, { status: 202 })
+    return NextResponse.json({ runId: run.id }, { status: 202 })
+  } else {
+    // URL source — no file needed; insert run and fire immediately
+    const [run] = await db
+      .insert(pipelineRuns)
+      .values({ sourceId: id, status: 'running', triggeredAt: new Date() })
+      .returning()
+
+    runPipeline(run.id, id).catch(console.error)
+
+    return NextResponse.json({ runId: run.id }, { status: 202 })
+  }
 }
