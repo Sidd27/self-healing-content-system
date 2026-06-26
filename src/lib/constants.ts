@@ -1,0 +1,2 @@
+export const DRIFT_HIGH_THRESHOLD = 0.75
+export const CONTENT_MAX_CHARS = 500_000
