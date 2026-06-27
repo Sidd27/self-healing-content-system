@@ -52,7 +52,7 @@ export function buildGeneratePrompt(
   description: string,
   extractedContent: string
 ): string {
-  return `You are generating a learning unit for a professional certification exam.
+  return `You are generating learning content for a professional certification exam.
 
 Topic: "${topicName}"
 Description: "${description}"
@@ -62,12 +62,15 @@ Source content:
 ${extractedContent}
 ---
 
-Generate a learning unit as JSON with exactly these fields:
-- question: a multiple-choice or scenario-based exam question about this topic
-- rationale: a detailed explanation of why the correct answer is correct, grounded in the source content
-- lesson: a concise summary of the key concept a learner should understand from this topic
+Generate a JSON object with exactly these fields:
+- lesson: a clear, concise explanation of the key concept a learner must understand (2-4 sentences)
+- questions: an array of MCQ questions. Generate as many as the content depth warrants — more content means more questions, shallow content means fewer. Each question must have:
+  - question: the question text
+  - options: array of answer strings (typically 4, but match what makes sense for the question)
+  - correctIndex: zero-based index of the correct option
+  - rationale: one sentence explaining why that option is correct, grounded in the source
 
-The question, rationale, and lesson must be grounded only in the provided source content.`
+All content must come only from the provided source.`
 }
 
 export function buildProposeTopicsPrompt(

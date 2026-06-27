@@ -28,9 +28,8 @@ export async function GET(
       topicId: learningUnits.topicId,
       topicName: topics.name,
       versionId: learningUnitVersions.id,
-      question: learningUnitVersions.question,
-      rationale: learningUnitVersions.rationale,
       lesson: learningUnitVersions.lesson,
+      questions: learningUnitVersions.questions,
       status: learningUnitVersions.status,
       createdAt: learningUnitVersions.createdAt,
     })

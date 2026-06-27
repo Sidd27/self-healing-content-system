@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import {
   driftItems, topicExtractions, topics, learningUnits,
-  learningUnitVersions
+  learningUnitVersions, type McqQuestion
 } from '@/db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 import { generateText, Output } from 'ai'
@@ -10,10 +10,16 @@ import { buildGeneratePrompt } from '@/pipeline/prompts'
 import { llmModel } from '@/lib/llm'
 import { LLM_TIMEOUT_MS } from '@/lib/constants'
 
-const LearningUnitSchema = z.object({
+const McqSchema = z.object({
   question: z.string(),
+  options: z.array(z.string()),
+  correctIndex: z.number().int(),
   rationale: z.string(),
+})
+
+const LearningUnitSchema = z.object({
   lesson: z.string(),
+  questions: z.array(McqSchema),
 })
 
 export async function generateStage(
@@ -21,22 +27,15 @@ export async function generateStage(
   sourceVersionId: string,
   firstRunTopicIds: string[] = []
 ): Promise<void> {
-  // Generate for auto-applied drift items (changed topics)
   const autoAppliedItems = await db
     .select()
     .from(driftItems)
-    .where(
-      and(
-        eq(driftItems.pipelineRunId, runId),
-        eq(driftItems.status, 'auto_applied')
-      )
-    )
+    .where(and(eq(driftItems.pipelineRunId, runId), eq(driftItems.status, 'auto_applied')))
 
   for (const item of autoAppliedItems) {
     await generateForTopic(item.topicId, sourceVersionId, item.driftScore)
   }
 
-  // Generate for first-run topics (no drift to compare, generate from scratch)
   for (const topicId of firstRunTopicIds) {
     await generateForTopic(topicId, sourceVersionId, null)
   }
@@ -63,38 +62,21 @@ export async function generateForTopic(
     abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   })
 
-  // Get or create learning unit for this topic
-  let [unit] = await db
-    .select()
-    .from(learningUnits)
-    .where(eq(learningUnits.topicId, topicId))
-    .limit(1)
-
+  let [unit] = await db.select().from(learningUnits).where(eq(learningUnits.topicId, topicId)).limit(1)
   if (!unit) {
-    ;[unit] = await db
-      .insert(learningUnits)
-      .values({ topicId })
-      .returning()
+    ;[unit] = await db.insert(learningUnits).values({ topicId }).returning()
   }
 
-  // Archive previous active version
   await db
     .update(learningUnitVersions)
     .set({ status: 'archived' })
-    .where(
-      and(
-        eq(learningUnitVersions.learningUnitId, unit.id),
-        eq(learningUnitVersions.status, 'active')
-      )
-    )
+    .where(and(eq(learningUnitVersions.learningUnitId, unit.id), eq(learningUnitVersions.status, 'active')))
 
-  // Insert new active version
   await db.insert(learningUnitVersions).values({
     learningUnitId: unit.id,
     sourceVersionId,
-    question: object.question,
-    rationale: object.rationale,
     lesson: object.lesson,
+    questions: object.questions as McqQuestion[],
     driftScore,
     status: 'active',
   })

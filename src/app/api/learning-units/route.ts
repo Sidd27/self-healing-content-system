@@ -15,9 +15,8 @@ export async function GET(request: NextRequest) {
       topicId: learningUnits.topicId,
       topicName: topics.name,
       versionId: learningUnitVersions.id,
-      question: learningUnitVersions.question,
-      rationale: learningUnitVersions.rationale,
       lesson: learningUnitVersions.lesson,
+      questions: learningUnitVersions.questions,
       createdAt: learningUnitVersions.createdAt,
     })
     .from(learningUnitVersions)

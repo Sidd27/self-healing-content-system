@@ -22,9 +22,10 @@ CREATE TABLE "learning_unit_versions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"learning_unit_id" uuid NOT NULL,
 	"source_version_id" uuid NOT NULL,
-	"question" text NOT NULL,
-	"rationale" text NOT NULL,
+	"question" text,
+	"rationale" text,
 	"lesson" text NOT NULL,
+	"questions" json,
 	"drift_score" real,
 	"status" "learning_unit_status" DEFAULT 'active' NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL

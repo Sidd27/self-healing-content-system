@@ -1,5 +1,5 @@
 import {
-  pgTable, pgEnum, uuid, text, timestamp, real, boolean
+  pgTable, pgEnum, uuid, text, timestamp, real, boolean, json
 } from 'drizzle-orm/pg-core'
 
 export const sourceTypeEnum = pgEnum('source_type', ['url', 'pdf', 'md'])
@@ -76,13 +76,19 @@ export const learningUnits = pgTable('learning_units', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+export type McqQuestion = {
+  question: string
+  options: string[]
+  correctIndex: number
+  rationale: string
+}
+
 export const learningUnitVersions = pgTable('learning_unit_versions', {
   id: uuid('id').primaryKey().defaultRandom(),
   learningUnitId: uuid('learning_unit_id').notNull().references(() => learningUnits.id),
   sourceVersionId: uuid('source_version_id').notNull().references(() => sourceVersions.id),
-  question: text('question').notNull(),
-  rationale: text('rationale').notNull(),
   lesson: text('lesson').notNull(),
+  questions: json('questions').notNull().$type<McqQuestion[]>(),
   driftScore: real('drift_score'),
   status: learningUnitStatusEnum('status').notNull().default('active'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
