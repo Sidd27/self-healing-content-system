@@ -5,12 +5,9 @@ import {
 } from '@/db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 import { generateText, Output } from 'ai'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { buildGeneratePrompt } from '@/pipeline/prompts'
-
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
-const model = openrouter('google/gemini-2.0-flash-exp:free')
+import { llmModel } from '@/lib/llm'
 
 const LearningUnitSchema = z.object({
   question: z.string(),
@@ -59,13 +56,9 @@ export async function generateForTopic(
     .limit(1)
 
   const { output: object } = await generateText({
-    model,
+    model: llmModel,
     output: Output.object({ schema: LearningUnitSchema }),
-    prompt: buildGeneratePrompt(
-      topic.name,
-      topic.description,
-      latestExtraction.extractedContent
-    ),
+    prompt: buildGeneratePrompt(topic.name, topic.description, latestExtraction.extractedContent),
   })
 
   // Get or create learning unit for this topic

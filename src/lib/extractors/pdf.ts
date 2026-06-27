@@ -1,8 +1,7 @@
-// pdf-parse is CJS-only and lacks an ESM default export declaration
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
+import { extractText, getDocumentProxy } from 'unpdf'
 
 export async function extractFromPdf(buffer: Buffer): Promise<string> {
-  const data = await pdfParse(buffer)
-  return data.text
+  const pdf = await getDocumentProxy(new Uint8Array(buffer))
+  const { text } = await extractText(pdf, { mergePages: true })
+  return text
 }

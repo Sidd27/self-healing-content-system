@@ -2,13 +2,10 @@ import { db } from '@/db'
 import { topics, topicExtractions, driftItems } from '@/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { generateText, Output } from 'ai'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { buildDriftPrompt } from '@/pipeline/prompts'
 import { computeDriftLevel, computeRepairDecision } from './repair-decision'
-
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
-const model = openrouter('google/gemini-2.0-flash-exp:free')
+import { llmModel } from '@/lib/llm'
 
 const DriftAnalysisSchema = z.object({
   changeType: z.enum([
@@ -39,7 +36,7 @@ export async function driftAnalysisStage(
     const oldContent = extractions[1].extractedContent
 
     const { output: object } = await generateText({
-      model,
+      model: llmModel,
       output: Output.object({ schema: DriftAnalysisSchema }),
       prompt: buildDriftPrompt(topic.name, oldContent, newContent),
     })

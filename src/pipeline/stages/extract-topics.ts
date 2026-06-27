@@ -2,13 +2,10 @@ import { db } from '@/db'
 import { topics, topicExtractions, proposedTopics } from '@/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { generateText, Output } from 'ai'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { normalizeContent, hashContent } from '@/lib/normalize'
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts'
-
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
-const model = openrouter('google/gemini-2.0-flash-exp:free')
+import { llmModel } from '@/lib/llm'
 
 const ProposedTopicsSchema = z.array(z.object({
   name: z.string(),
@@ -39,7 +36,7 @@ export async function extractTopicsStage(
       .limit(1)
 
     const { text: extracted } = await generateText({
-      model,
+      model: llmModel,
       prompt: buildExtractPrompt(topic.name, topic.description, normalizedContent),
       temperature: 0,
     })
@@ -70,7 +67,7 @@ export async function extractTopicsStage(
   if (sourceTopics.length > 0) {
     const existingNames = sourceTopics.map(t => t.name)
     const { output: proposed } = await generateText({
-      model,
+      model: llmModel,
       output: Output.object({ schema: ProposedTopicsSchema }),
       prompt: buildProposeTopicsPrompt(existingNames, normalizedContent),
     })
