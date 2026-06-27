@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { fmtDate } from '@/lib/utils'
 
 type Topic = { id: string; name: string; description: string }
-type Run = { id: string; status: 'running' | 'completed' | 'failed' | 'awaiting_review'; triggeredAt: string }
+type Run = { id: string; status: 'running' | 'completed' | 'failed' | 'awaiting_review'; triggeredAt: string; sourceVersionId: string | null }
 type Version = { id: string; contentHash: string; createdAt: string }
 type SourceDetail = {
   id: string; name: string; type: 'url' | 'pdf' | 'md'
@@ -151,6 +151,40 @@ export default function SourceDetailPage() {
 
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
+      )}
+
+      {/* Source Versions */}
+      {source.versions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Version History ({source.versions.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {source.versions.map((v, i) => {
+              const run = source.runs.find(r => r.sourceVersionId === v.id)
+              return (
+                <div key={v.id} className="flex items-center justify-between border rounded px-3 py-2 gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {i === 0 ? 'Latest' : `v${source.versions.length - i}`}
+                    </span>
+                    <span className="text-xs font-mono text-muted-foreground truncate">
+                      {v.contentHash.slice(0, 12)}
+                    </span>
+                    <span className="text-xs text-muted-foreground" suppressHydrationWarning>
+                      {fmtDate(v.createdAt)}
+                    </span>
+                  </div>
+                  {run && (
+                    <Link href={`/admin/pipeline/${run.id}`} className="text-xs text-primary hover:underline shrink-0">
+                      View run →
+                    </Link>
+                  )}
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
       )}
 
       {/* Topics */}

@@ -1,13 +1,44 @@
 # Self-Healing Content System
 
-A system that keeps AI-generated learning content accurate as source materials change. When a source document (URL, PDF, or Markdown) is updated, the pipeline detects what changed, scores the semantic drift, and either auto-repairs or queues affected content for human review.
+Keeps AI-generated learning content accurate as source materials change. When a source document (URL, PDF, or Markdown) is updated, the pipeline detects what changed, scores the semantic drift per topic, and either auto-repairs or queues affected content for human review.
+
+Built for the Memorang Full-Stack Engineer Skills Exercise B.
+
+---
+
+## How It Works
+
+```
+Source updated
+  → Ingest → Normalize → Hash Check (no-op if unchanged)
+  → Extract Topics → Drift Analysis → Repair Decision
+      ↓ drift < 0.75          ↓ drift ≥ 0.75
+   Auto-apply              Human review queue
+      ↓
+   Generate: lesson + MCQ questions per topic
+```
+
+**First run:** LLM extracts topics → human approves each → Generate runs.  
+**Re-run:** drift scored per topic → auto-heal or hold for review.
+
+Full design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+
+---
 
 ## Tech Stack
 
 - **Next.js 15** (App Router) + TypeScript
 - **Drizzle ORM** + **Supabase** (Postgres + Storage)
-- **Mastra** + **OpenRouter** (Gemini 2.0 Flash) or local **Ollama** (Qwen 3.5)
-- **Shadcn/ui** + Tailwind CSS v4
+- **Vercel AI SDK** — provider-agnostic LLM calls (Ollama / OpenRouter / OpenAI)
+- **shadcn/ui** + Tailwind CSS
+
+---
+
+## Prerequisites
+
+- Node.js 20+
+- [Supabase](https://supabase.com) project (free tier)
+- LLM — local [Ollama](https://ollama.ai) **or** [OpenRouter](https://openrouter.ai) free tier
 
 ---
 
@@ -27,108 +58,119 @@ npm install
 cp .env.local.example .env.local
 ```
 
-Fill in `.env.local`:
+| Variable | Where to get it |
+|---|---|
+| `DATABASE_URL` | Supabase → Settings → Database → **Transaction pooler** URL (port **6543**) |
+| `SUPABASE_URL` | Supabase → Settings → API → Project URL |
+| `SUPABASE_SECRET_KEY` | Supabase → Settings → API → `service_role` secret |
+| `OPENAI_BASE_URL` | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1` |
+| `LLM_MODEL_NAME` | e.g. `llama3.2:latest` or `meta-llama/llama-3.1-8b-instruct:free` |
+| `LLM_API_KEY` | `ollama` (local) or your OpenRouter key |
 
-```
-# Supabase — postgres connection (Transaction pooler, port 6543)
-# Supabase dashboard → Settings → Database → Connection Pooling → Transaction mode
-DATABASE_URL=postgresql://postgres.xxxx:password@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres
+### 3. Supabase storage bucket
 
-# Supabase — file storage (PDF/MD uploads)
-# Supabase dashboard → Settings → API → Project URL
-SUPABASE_URL=https://xxxx.supabase.co
-# Supabase dashboard → Settings → API → secret key (previously called service_role)
-SUPABASE_SECRET_KEY=sb_secret_...
+Supabase → Storage → **New bucket** → name: `source-files` → enable **Public**.
 
-# LLM provider — OpenRouter (cloud) or Ollama (local), pick one:
-#
-# OpenRouter:
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-LLM_MODEL_NAME=google/gemini-2.0-flash-exp:free
-LLM_API_KEY=sk-or-...
-#
-# Ollama (local):
-# OPENAI_BASE_URL=http://localhost:11434/v1
-# LLM_MODEL_NAME=qwen3.5:latest
-# LLM_API_KEY=ollama
-```
+This stores uploaded PDFs and Markdown files so the pipeline can re-fetch them on re-runs without re-uploading.
 
-### 3. Supabase Storage bucket
-
-In your Supabase project → **Storage** → **New bucket**:
-- Name: `source-files`
-- Toggle **Public bucket** ON
-
-This is where uploaded PDFs and Markdown files are stored so the pipeline can re-fetch them on re-runs.
-
-### 4. Run database migrations
+### 4. Database
 
 ```bash
-npx drizzle-kit migrate
+npx drizzle-kit push
 ```
 
-### 5. Seed initial data (optional)
-
-```bash
-npx tsx scripts/seed.ts
-```
-
-Creates two sources (a URL source and a PDF source) with pre-defined topics to test the pipeline immediately.
-
-### 6. Start dev server
+### 5. Start
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — redirects to `/admin/sources`.
+Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## How it works
+## Ollama (local, no API cost)
 
-### Pipeline (7 stages)
+```bash
+ollama pull llama3.2
+```
 
-Every time you trigger a run on a source, these stages execute in order:
-
-1. **Ingest** — fetch content from `source.url` (web page, Supabase Storage PDF/MD)
-2. **Normalize** — clean text, compute MD5 hash
-3. **Hash Check** — compare with previous version; stop if unchanged
-4. **Extract Topics** — LLM extracts relevant passages per topic
-5. **Drift Analysis** — LLM scores how much each topic's content changed (0–1)
-6. **Repair Decision** — score < 0.75 → auto-apply; score ≥ 0.75 → human review queue
-7. **Generate** — LLM writes question + rationale + lesson for changed topics
-
-### Re-running a failed pipeline
-
-For all source types (URL, PDF, MD) — go to the source page and click **Run Pipeline** again. PDF/MD files are stored in Supabase Storage from the first upload, so no re-upload is needed.
-
-### Human review
-
-- Drift score ≥ 0.75 → pipeline pauses, items queued at `/admin/review`
-- New topics detected by LLM → proposed topics queued for approval
-- Approving a proposed topic immediately generates its first learning unit
+`.env.local`:
+```
+OPENAI_BASE_URL=http://localhost:11434/v1
+LLM_MODEL_NAME=llama3.2:latest
+LLM_API_KEY=ollama
+```
 
 ---
 
-## Pages
+## Walkthrough
 
-### Admin
+### Add a source
+
+**Admin → Sources → Add Source** — choose PDF and paste a direct link (e.g. the [GCP Architect exam guide](https://services.google.com/fh/files/misc/professional_cloud_architect_exam_guide_english.pdf)), or leave the URL blank and upload a file on the source detail page.
+
+### Run the pipeline
+
+Open the source → **Run Pipeline**. Watch 7 stages execute live.
+
+### Approve first-run topics
+
+After Extract Topics, the run pauses. Proposed topics appear on the run page — approve to generate content, reject to discard.
+
+### Simulate drift
+
+Upload a revised version of the source (or paste a different URL) and run again:
+- Drift **< 0.75** → auto-healed, new content generated immediately
+- Drift **≥ 0.75** → held for review; approve/reject on the pipeline run page
+
+### Learner view
+
+**Learner → Browse Topics** → pick a topic:
+- **Step 1** — read the lesson
+- **Step 2** — answer MCQ questions; click an option to reveal right/wrong + rationale
+
+---
+
+## Admin pages
+
 | Route | Purpose |
 |---|---|
-| `/admin/sources` | Manage sources, trigger pipeline |
-| `/admin/sources/[id]` | Source detail, upload PDF/MD, run history |
-| `/admin/pipeline/[runId]` | Live pipeline stage progress |
-| `/admin/review` | Approve/reject drift items and proposed topics |
-
-### Learner
-| Route | Purpose |
-|---|---|
-| `/learner/topics` | Browse all topics grouped by source |
-| `/learner/topics/[topicId]` | Learning unit with progressive reveal (question → rationale → lesson) |
+| `/admin/sources` | List and create sources |
+| `/admin/sources/[id]` | Source detail — upload file, version history, trigger pipeline |
+| `/admin/pipeline` | All pipeline runs across all sources |
+| `/admin/pipeline/[runId]` | Live stage progress + inline approve/reject for pending items |
 
 ---
 
-## Architecture
+## Project structure
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full system design diagram, data model, component map, and key technical decisions.
+```
+src/
+  app/
+    admin/          # Sources, pipeline list, pipeline run detail
+    learner/        # Topic browser + MCQ quiz
+    api/            # REST endpoints
+  pipeline/
+    stages/         # ingest · normalize · hash-check · extract-topics
+                    # drift-analysis · repair-decision · generate
+    stage-runner.ts # Idempotent stage execution + resume
+    run.ts          # 7-stage orchestration
+  db/
+    schema.ts       # Drizzle schema
+  lib/
+    extractors/     # URL, PDF (unpdf), Markdown
+    normalize.ts    # Text normalization + MD5 hash
+    llm.ts          # LLM provider config
+docs/
+  ARCHITECTURE.md   # System design, data model, decisions
+```
+
+---
+
+## Useful scripts
+
+```bash
+npx tsx scripts/clean-db.ts          # Truncate all tables (keeps schema)
+npx vitest run src/__tests__         # Unit tests (normalize, drift logic)
+```

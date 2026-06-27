@@ -19,7 +19,12 @@ export async function GET(
     .where(eq(sourceVersions.sourceId, id))
     .orderBy(desc(sourceVersions.createdAt))
   const runs = await db
-    .select()
+    .select({
+      id: pipelineRuns.id,
+      status: pipelineRuns.status,
+      triggeredAt: pipelineRuns.triggeredAt,
+      sourceVersionId: pipelineRuns.sourceVersionId,
+    })
     .from(pipelineRuns)
     .where(eq(pipelineRuns.sourceId, id))
     .orderBy(desc(pipelineRuns.triggeredAt))
