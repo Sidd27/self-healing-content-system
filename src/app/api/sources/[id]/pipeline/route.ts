@@ -15,16 +15,17 @@ export async function POST(
   if (!source) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   if (source.type === 'pdf' || source.type === 'md') {
-    const formData = await req.formData()
-    const file = formData.get('file')
-
-    if (!file || typeof file === 'string') {
-      return NextResponse.json({ error: 'File required for pdf/md sources' }, { status: 400 })
+    if (!source.url) {
+      // First run — file upload required
+      const formData = await req.formData()
+      const file = formData.get('file')
+      if (!file || typeof file === 'string') {
+        return NextResponse.json({ error: 'File required for pdf/md sources on first run' }, { status: 400 })
+      }
+      const { url } = await uploadSourceFile(id, file as File)
+      await db.update(sources).set({ url }).where(eq(sources.id, id))
     }
-
-    // Upload to Supabase Storage and store the public URL on the source
-    const { url } = await uploadSourceFile(id, file as File)
-    await db.update(sources).set({ url }).where(eq(sources.id, id))
+    // Re-run: source.url already set from previous upload — nothing to do
   }
 
   const [run] = await db
