@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/db'
-import { proposedTopics, topics, pipelineRuns } from '@/db/schema'
+import { proposedTopics, topics, pipelineRuns, topicExtractions } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { generateForTopic } from '@/pipeline/stages/generate'
+import { normalizeContent, hashContent } from '@/lib/normalize'
 
 export async function POST(
   req: Request,
@@ -27,6 +28,7 @@ export async function POST(
       .select()
       .from(pipelineRuns)
       .where(eq(pipelineRuns.id, proposed.pipelineRunId))
+    if (!run) return NextResponse.json({ error: 'Run not found' }, { status: 404 })
 
     // Create the topic
     const [newTopic] = await db
@@ -37,6 +39,15 @@ export async function POST(
         description: proposed.description,
       })
       .returning()
+
+    // Seed topicExtractions so generateForTopic can find content for this brand-new topic
+    const normalized = normalizeContent(proposed.extractedContent)
+    await db.insert(topicExtractions).values({
+      topicId: newTopic.id,
+      sourceVersionId: proposed.sourceVersionId,
+      extractedContent: normalized,
+      contentHash: hashContent(normalized),
+    })
 
     await db
       .update(proposedTopics)

@@ -166,7 +166,7 @@ export default function SourceDetailPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {source.runs.map((r) => (
-            <Link key={r.id} href={`/admin/runs/${r.id}`}>
+            <Link key={r.id} href={`/admin/pipeline/${r.id}`}>
               <div className="flex items-center justify-between border rounded p-3 hover:bg-accent/50 transition-colors cursor-pointer">
                 <span className="text-xs text-muted-foreground font-mono">
                   {r.id.slice(0, 8)}
