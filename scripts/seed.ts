@@ -7,7 +7,7 @@ import { sources, topics } from '../src/db/schema'
 
 // Create client here (after loadEnvConfig) instead of importing shared db
 // to avoid ESM hoisting causing DATABASE_URL to be undefined
-const client = postgres(process.env.DATABASE_URL!, { ssl: 'require' })
+const client = postgres(process.env.DATABASE_URL!, { ssl: 'require', prepare: false })
 const db = drizzle(client, { schema: { sources, topics } })
 
 async function seed() {
