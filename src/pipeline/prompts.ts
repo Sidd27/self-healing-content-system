@@ -77,21 +77,27 @@ export function buildProposeTopicsPrompt(
   existingTopicNames: string[],
   newContent: string
 ): string {
-  return `You are identifying new topics in source content that are not yet covered.
+  const existingSection = existingTopicNames.length > 0
+    ? `Topics already covered (do NOT re-propose these):\n${existingTopicNames.map(n => `- ${n}`).join('\n')}`
+    : `No topics have been defined yet. You must identify all significant topics from the content.`
 
-Existing topics already defined:
-${existingTopicNames.map(n => `- ${n}`).join('\n')}
+  return `You are identifying learning topics from source content for a professional certification exam.
 
-New/changed content:
+${existingSection}
+
+Source content:
 ---
 ${newContent}
 ---
 
-Identify any significant topics in the above content that are NOT covered by the existing topics.
-Return a JSON array. Each item must have:
+Return a JSON object with a single key "topics" whose value is an array of topic objects.
+Each object must have:
 - name: short topic name (3-6 words)
 - description: one sentence describing what this topic covers
-- extractedContent: verbatim passages from the content that are relevant to this topic
+- extractedContent: verbatim passages from the content relevant to this topic
 
-If no new topics are found, return an empty array.`
+${existingTopicNames.length === 0
+  ? 'Identify all significant topics a learner would need to know. Return at least 3 topics if the content is substantive.'
+  : 'Only include topics NOT already in the existing list. Return an empty array if nothing new is found.'
+}`
 }

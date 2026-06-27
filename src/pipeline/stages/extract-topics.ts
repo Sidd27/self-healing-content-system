@@ -9,11 +9,15 @@ import { llmModel } from '@/lib/llm'
 import { LLM_TIMEOUT_MS } from '@/lib/constants'
 import { computeDriftLevel } from './repair-decision'
 
-const ProposedTopicsSchema = z.array(z.object({
-  name: z.string(),
-  description: z.string(),
-  extractedContent: z.string(),
-}))
+// Wrapped in an object — bare z.array at the top level causes silent empty
+// responses from smaller models with structured output
+const ProposedTopicsSchema = z.object({
+  topics: z.array(z.object({
+    name: z.string(),
+    description: z.string(),
+    extractedContent: z.string(),
+  })),
+})
 
 export async function extractTopicsStage(
   runId: string,
@@ -86,10 +90,10 @@ export async function extractTopicsStage(
     abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   })
 
-  if (proposed.length > 0) {
-    proposedCount = proposed.length
+  if (proposed.topics.length > 0) {
+    proposedCount = proposed.topics.length
     await db.insert(proposedTopics).values(
-      proposed.map(p => ({
+      proposed.topics.map(p => ({
         sourceVersionId,
         pipelineRunId: runId,
         name: p.name,
