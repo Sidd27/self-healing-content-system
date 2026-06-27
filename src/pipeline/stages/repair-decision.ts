@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import { driftItems, pipelineRuns, proposedTopics } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { DRIFT_HIGH_THRESHOLD } from '@/lib/constants';
 import { log } from '@/lib/logger';
 
@@ -20,18 +20,19 @@ export async function repairDecisionStage(runId: string): Promise<{ paused: bool
     .from(driftItems)
     .where(eq(driftItems.pipelineRunId, runId));
 
-  const runProposedTopics = await db
-    .select()
+  const [pendingTopic] = await db
+    .select({ id: proposedTopics.id })
     .from(proposedTopics)
-    .where(eq(proposedTopics.pipelineRunId, runId));
+    .where(and(eq(proposedTopics.pipelineRunId, runId), eq(proposedTopics.status, 'pending_approval')))
+    .limit(1);
 
   const hasPendingReview = runDriftItems.some((d) => d.status === 'pending_review');
-  const hasPendingTopics = runProposedTopics.length > 0;
+  const hasPendingTopics = !!pendingTopic;
 
   log.info('repair_decision', 'decision', {
     driftItems: runDriftItems.length,
     pendingReview: hasPendingReview,
-    proposedTopics: runProposedTopics.length,
+    pendingTopics: hasPendingTopics,
     paused: hasPendingReview,
     awaitingReview: hasPendingReview || hasPendingTopics,
   });

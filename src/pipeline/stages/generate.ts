@@ -52,6 +52,8 @@ export async function generateForTopic(
     .orderBy(desc(topicExtractions.createdAt))
     .limit(1);
 
+  if (!latestExtraction) throw new Error(`No extraction found for topic ${topicId} — cannot generate`);
+
   log.info('generate', 'generating learning unit', { topic: topic.name, driftScore });
 
   const { object } = await generationAgent.generate(

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { proposedTopics, topics, pipelineRuns, topicExtractions, sourceVersions } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { generateForTopic } from '@/pipeline/stages/generate';
 import { normalizeText, hashContent } from '@/lib/utils';
 import { markGenerateRunning, tryCompleteRun } from '@/lib/close-run';
@@ -31,42 +31,57 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .where(eq(pipelineRuns.id, proposed.pipelineRunId));
     if (!run) return NextResponse.json({ error: 'Run not found' }, { status: 404 });
 
-    // Create the topic
-    const [newTopic] = await db
-      .insert(topics)
-      .values({
-        sourceId: run.sourceId,
-        name: proposed.name,
-        description: proposed.description,
-      })
-      .returning();
+    // Idempotent topic creation — handles retries after a failed generation
+    let [topic] = await db
+      .select()
+      .from(topics)
+      .where(and(eq(topics.sourceId, run.sourceId), eq(topics.name, proposed.name)));
+    if (!topic) {
+      [topic] = await db
+        .insert(topics)
+        .values({ sourceId: run.sourceId, name: proposed.name, description: proposed.description })
+        .returning();
+    }
 
-    // Re-extract using buildExtractPrompt so the seeded baseline matches the prompt
-    // used by extract-topics stage on every future run (proposed.extractedContent used
-    // a different prompt, making hash comparison meaningless).
+    // Seed extraction using buildExtractPrompt so the baseline is consistent with
+    // every future extract-topics comparison (only seed if not already seeded).
     const [version] = await db
       .select({ normalizedContent: sourceVersions.normalizedContent })
       .from(sourceVersions)
       .where(eq(sourceVersions.id, proposed.sourceVersionId));
-    const rawExtracted = version
-      ? (await extractionAgent.generate(buildExtractPrompt(proposed.name, proposed.description, version.normalizedContent))).text
-      : proposed.extractedContent;
-    const normalized = normalizeText(rawExtracted);
-    await db.insert(topicExtractions).values({
-      topicId: newTopic.id,
-      sourceVersionId: proposed.sourceVersionId,
-      extractedContent: normalized,
-      contentHash: hashContent(normalized),
-    });
+    if (!version) throw new Error(`Source version ${proposed.sourceVersionId} not found`);
+
+    const [existingExtraction] = await db
+      .select({ id: topicExtractions.id })
+      .from(topicExtractions)
+      .where(eq(topicExtractions.topicId, topic.id));
+    if (!existingExtraction) {
+      const rawExtracted = (
+        await extractionAgent.generate(
+          buildExtractPrompt(proposed.name, proposed.description, version.normalizedContent)
+        )
+      ).text;
+      const normalized = normalizeText(rawExtracted);
+      await db.insert(topicExtractions).values({
+        topicId: topic.id,
+        sourceVersionId: proposed.sourceVersionId,
+        extractedContent: normalized,
+        contentHash: hashContent(normalized),
+      });
+    }
+
+    await markGenerateRunning(proposed.pipelineRunId);
+    try {
+      await generateForTopic(topic.id, proposed.sourceVersionId, null);
+    } catch (err) {
+      console.error('generateForTopic failed for proposed topic', id, err);
+      return NextResponse.json({ error: 'Generation failed — topic created, retry to generate' }, { status: 500 });
+    }
 
     await db
       .update(proposedTopics)
       .set({ status: 'approved', reviewedAt: new Date() })
       .where(eq(proposedTopics.id, id));
-
-    // Generate learning unit from the proposed content
-    await markGenerateRunning(proposed.pipelineRunId);
-    await generateForTopic(newTopic.id, proposed.sourceVersionId, null);
     await tryCompleteRun(proposed.pipelineRunId);
 
     return NextResponse.json({ ok: true });

@@ -1,6 +1,6 @@
 import { db } from '@/db';
-import { pipelineRuns, sourceVersions, topics, topicExtractions } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { pipelineRuns, sourceVersions, topics, topicExtractions, driftItems } from '@/db/schema';
+import { eq, desc, and } from 'drizzle-orm';
 import { runStage, skipStage } from './stage-runner';
 import { ingestStage } from './stages/ingest';
 import { extractTopicsStage } from './stages/extract-topics';
@@ -78,7 +78,15 @@ export async function runPipeline(runId: string, sourceId: string): Promise<void
   }
 
   const { paused } = await runStage(runId, 'repair_decision', () => repairDecisionStage(runId), {
-    onResume: () => repairDecisionStage(runId),
+    onResume: async () => {
+      // Read current pending state — don't re-run the stage (avoids resetting run status)
+      const [pendingDrift] = await db
+        .select({ id: driftItems.id })
+        .from(driftItems)
+        .where(and(eq(driftItems.pipelineRunId, runId), eq(driftItems.status, 'pending_review')))
+        .limit(1);
+      return { paused: !!pendingDrift };
+    },
   });
   if (paused) {
     // Leave generate as pending — it will run as high-drift items are approved via review API

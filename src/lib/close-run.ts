@@ -32,46 +32,54 @@ export async function markGenerateRunning(runId: string): Promise<void> {
  * If so, mark the generate stage and the run itself as completed.
  */
 export async function tryCompleteRun(runId: string): Promise<void> {
-  const [pendingDrift] = await db
-    .select({ id: driftItems.id })
-    .from(driftItems)
-    .where(and(eq(driftItems.pipelineRunId, runId), eq(driftItems.status, 'pending_review')))
-    .limit(1);
-  if (pendingDrift) return;
+  await db.transaction(async (tx) => {
+    // Lock the run row first — serializes concurrent tryCompleteRun calls so only
+    // one thread can observe "no pending items" and drive to completion.
+    const [run] = await tx
+      .select({ status: pipelineRuns.status })
+      .from(pipelineRuns)
+      .where(eq(pipelineRuns.id, runId))
+      .for('update');
+    if (!run || run.status !== 'awaiting_review') return;
 
-  const [pendingTopic] = await db
-    .select({ id: proposedTopics.id })
-    .from(proposedTopics)
-    .where(
-      and(eq(proposedTopics.pipelineRunId, runId), eq(proposedTopics.status, 'pending_approval'))
-    )
-    .limit(1);
-  if (pendingTopic) return;
+    const [pendingDrift] = await tx
+      .select({ id: driftItems.id })
+      .from(driftItems)
+      .where(and(eq(driftItems.pipelineRunId, runId), eq(driftItems.status, 'pending_review')))
+      .limit(1);
+    if (pendingDrift) return;
 
-  // All items resolved — close out the generate stage and the run.
-  // Upsert: the row may not exist if all items were rejected (markGenerateRunning never called).
-  const [existingGenerate] = await db
-    .select({ id: pipelineStages.id })
-    .from(pipelineStages)
-    .where(and(eq(pipelineStages.pipelineRunId, runId), eq(pipelineStages.stage, 'generate')));
+    const [pendingTopic] = await tx
+      .select({ id: proposedTopics.id })
+      .from(proposedTopics)
+      .where(and(eq(proposedTopics.pipelineRunId, runId), eq(proposedTopics.status, 'pending_approval')))
+      .limit(1);
+    if (pendingTopic) return;
 
-  if (existingGenerate) {
-    await db
-      .update(pipelineStages)
-      .set({ status: 'completed', completedAt: new Date() })
+    // All items resolved — upsert generate stage then close the run.
+    const [existingGenerate] = await tx
+      .select({ id: pipelineStages.id })
+      .from(pipelineStages)
       .where(and(eq(pipelineStages.pipelineRunId, runId), eq(pipelineStages.stage, 'generate')));
-  } else {
-    await db.insert(pipelineStages).values({
-      pipelineRunId: runId,
-      stage: 'generate',
-      status: 'completed',
-      startedAt: new Date(),
-      completedAt: new Date(),
-    });
-  }
 
-  await db
-    .update(pipelineRuns)
-    .set({ status: 'completed', completedAt: new Date() })
-    .where(and(eq(pipelineRuns.id, runId), eq(pipelineRuns.status, 'awaiting_review')));
+    if (existingGenerate) {
+      await tx
+        .update(pipelineStages)
+        .set({ status: 'completed', completedAt: new Date() })
+        .where(and(eq(pipelineStages.pipelineRunId, runId), eq(pipelineStages.stage, 'generate')));
+    } else {
+      await tx.insert(pipelineStages).values({
+        pipelineRunId: runId,
+        stage: 'generate',
+        status: 'completed',
+        startedAt: new Date(),
+        completedAt: new Date(),
+      });
+    }
+
+    await tx
+      .update(pipelineRuns)
+      .set({ status: 'completed', completedAt: new Date() })
+      .where(eq(pipelineRuns.id, runId));
+  });
 }

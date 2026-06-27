@@ -19,8 +19,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   if (action === 'approve') {
-    await db.update(driftItems).set({ status: 'approved' }).where(eq(driftItems.id, id));
-
     const [run] = await db
       .select()
       .from(pipelineRuns)
@@ -31,8 +29,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         { status: 500 }
       );
     }
+
     await markGenerateRunning(item.pipelineRunId);
-    await generateForTopic(item.topicId, run.sourceVersionId, item.driftScore);
+    try {
+      await generateForTopic(item.topicId, run.sourceVersionId, item.driftScore);
+    } catch (err) {
+      console.error('generateForTopic failed for drift item', id, err);
+      return NextResponse.json({ error: 'Generation failed — item left pending' }, { status: 500 });
+    }
+
+    await db.update(driftItems).set({ status: 'approved' }).where(eq(driftItems.id, id));
     await tryCompleteRun(item.pipelineRunId);
 
     return NextResponse.json({ ok: true });
