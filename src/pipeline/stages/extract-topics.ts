@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import { topics, topicExtractions, proposedTopics } from '@/db/schema'
 import { eq, desc } from 'drizzle-orm'
-import { generateText, generateObject } from 'ai'
+import { generateText, Output } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { normalizeContent, hashContent } from '@/lib/normalize'
@@ -69,9 +69,9 @@ export async function extractTopicsStage(
   // Propose new topics from content not covered by existing topics
   if (sourceTopics.length > 0) {
     const existingNames = sourceTopics.map(t => t.name)
-    const { object: proposed } = await generateObject({
+    const { output: proposed } = await generateText({
       model,
-      schema: ProposedTopicsSchema,
+      output: Output.object({ schema: ProposedTopicsSchema }),
       prompt: buildProposeTopicsPrompt(existingNames, normalizedContent),
     })
 

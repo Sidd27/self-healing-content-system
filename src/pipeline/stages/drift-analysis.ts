@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import { topics, topicExtractions, driftItems } from '@/db/schema'
 import { eq, desc } from 'drizzle-orm'
-import { generateObject } from 'ai'
+import { generateText, Output } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { buildDriftPrompt } from '@/pipeline/prompts'
@@ -38,9 +38,9 @@ export async function driftAnalysisStage(
     const newContent = extractions[0].extractedContent
     const oldContent = extractions[1].extractedContent
 
-    const { object } = await generateObject({
+    const { output: object } = await generateText({
       model,
-      schema: DriftAnalysisSchema,
+      output: Output.object({ schema: DriftAnalysisSchema }),
       prompt: buildDriftPrompt(topic.name, oldContent, newContent),
     })
 

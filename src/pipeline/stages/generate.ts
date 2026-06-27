@@ -4,7 +4,7 @@ import {
   learningUnitVersions
 } from '@/db/schema'
 import { eq, and, desc } from 'drizzle-orm'
-import { generateObject } from 'ai'
+import { generateText, Output } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { buildGeneratePrompt } from '@/pipeline/prompts'
@@ -58,9 +58,9 @@ export async function generateForTopic(
     .orderBy(desc(topicExtractions.createdAt))
     .limit(1)
 
-  const { object } = await generateObject({
+  const { output: object } = await generateText({
     model,
-    schema: LearningUnitSchema,
+    output: Output.object({ schema: LearningUnitSchema }),
     prompt: buildGeneratePrompt(
       topic.name,
       topic.description,
