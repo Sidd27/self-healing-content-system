@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { fmtDate } from "@/lib/utils";
 
 type StageStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 type RunStatus = "running" | "completed" | "failed" | "awaiting_review";
@@ -235,12 +236,12 @@ export default function PipelineRunPage() {
             <h1 className="text-2xl font-semibold">Pipeline Run</h1>
             <RunStatusBadge status={run.status} />
           </div>
-          <p className="text-sm text-muted-foreground">
-            Triggered: {new Date(run.triggeredAt).toLocaleString()}
+          <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+            Triggered: {fmtDate(run.triggeredAt)}
           </p>
           {run.completedAt && (
-            <p className="text-sm text-muted-foreground">
-              Completed: {new Date(run.completedAt).toLocaleString()}
+            <p className="text-sm text-muted-foreground" suppressHydrationWarning>
+              Completed: {fmtDate(run.completedAt)}
             </p>
           )}
           <p className="text-xs text-muted-foreground font-mono">{run.id}</p>
