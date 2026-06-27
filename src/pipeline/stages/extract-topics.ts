@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { normalizeContent, hashContent } from '@/lib/normalize'
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts'
 import { llmModel } from '@/lib/llm'
+import { LLM_TIMEOUT_MS } from '@/lib/constants'
 
 const ProposedTopicsSchema = z.array(z.object({
   name: z.string(),
@@ -39,6 +40,7 @@ export async function extractTopicsStage(
       model: llmModel,
       prompt: buildExtractPrompt(topic.name, topic.description, normalizedContent),
       temperature: 0,
+      abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     })
 
     const normalizedExtraction = normalizeContent(extracted)
@@ -70,6 +72,7 @@ export async function extractTopicsStage(
       model: llmModel,
       output: Output.object({ schema: ProposedTopicsSchema }),
       prompt: buildProposeTopicsPrompt(existingNames, normalizedContent),
+      abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     })
 
     if (proposed.length > 0) {

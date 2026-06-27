@@ -8,6 +8,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { buildGeneratePrompt } from '@/pipeline/prompts'
 import { llmModel } from '@/lib/llm'
+import { LLM_TIMEOUT_MS } from '@/lib/constants'
 
 const LearningUnitSchema = z.object({
   question: z.string(),
@@ -59,6 +60,7 @@ export async function generateForTopic(
     model: llmModel,
     output: Output.object({ schema: LearningUnitSchema }),
     prompt: buildGeneratePrompt(topic.name, topic.description, latestExtraction.extractedContent),
+    abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   })
 
   // Get or create learning unit for this topic

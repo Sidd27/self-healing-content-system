@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { buildDriftPrompt } from '@/pipeline/prompts'
 import { computeDriftLevel, computeRepairDecision } from './repair-decision'
 import { llmModel } from '@/lib/llm'
+import { LLM_TIMEOUT_MS } from '@/lib/constants'
 
 const DriftAnalysisSchema = z.object({
   changeType: z.enum([
@@ -39,6 +40,7 @@ export async function driftAnalysisStage(
       model: llmModel,
       output: Output.object({ schema: DriftAnalysisSchema }),
       prompt: buildDriftPrompt(topic.name, oldContent, newContent),
+      abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     })
 
     const driftLevel = computeDriftLevel(object.driftScore)
