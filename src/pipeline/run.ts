@@ -34,25 +34,25 @@ export async function runPipeline(
     return
   }
 
-  const { affectedTopicIds, firstRunTopicIds, proposedCount } = await runStage(runId, 'extract_topics', () =>
+  const { affectedTopicIds, firstRunTopicIds } = await runStage(runId, 'extract_topics', () =>
     extractTopicsStage(runId, sourceId, sourceVersionId, normalized)
   )
 
   if (affectedTopicIds.length === 0) {
+    // First run — no drift to analyze, but still run repair decision to catch proposed topics
     await skipStage(runId, 'drift_analysis')
-    await skipStage(runId, 'repair_decision')
-
-    if (firstRunTopicIds.length === 0 && proposedCount > 0) {
-      // No pre-defined topics — only LLM proposals which need human approval first
-      await skipStage(runId, 'generate')
-      await db.update(pipelineRuns).set({ status: 'awaiting_review', completedAt: new Date() }).where(eq(pipelineRuns.id, runId))
-      return
-    }
-
-    // Pre-defined topics on first run go straight to generate (admin already approved these topics)
-    await runStage(runId, 'generate', () =>
-      generateStage(runId, sourceVersionId, firstRunTopicIds)
+    const { paused } = await runStage(runId, 'repair_decision', () =>
+      repairDecisionStage(runId)
     )
+
+    if (paused) {
+      // Shouldn't happen on first run (no drift items), but guard anyway
+      await skipStage(runId, 'generate')
+    } else {
+      await runStage(runId, 'generate', () =>
+        generateStage(runId, sourceVersionId, firstRunTopicIds)
+      )
+    }
   } else {
     await runStage(runId, 'drift_analysis', () =>
       driftAnalysisStage(runId, affectedTopicIds, sourceVersionId)
@@ -63,18 +63,28 @@ export async function runPipeline(
     )
 
     if (paused) {
+      // High-drift items need human approval before Generate
       await skipStage(runId, 'generate')
-      return
+    } else {
+      // auto_applied drift items + any first-run topics in same pass
+      await runStage(runId, 'generate', () =>
+        generateStage(runId, sourceVersionId, firstRunTopicIds)
+      )
     }
-
-    // auto_applied drift items + any first-run topics in same pass
-    await runStage(runId, 'generate', () =>
-      generateStage(runId, sourceVersionId, firstRunTopicIds)
-    )
   }
 
-  await db
-    .update(pipelineRuns)
-    .set({ status: 'completed', completedAt: new Date() })
-    .where(eq(pipelineRuns.id, runId))
+  // Only mark completed if repair_decision didn't already set awaiting_review
+  const [current] = await db.select({ status: pipelineRuns.status }).from(pipelineRuns).where(eq(pipelineRuns.id, runId))
+  if (current?.status === 'running') {
+    await db
+      .update(pipelineRuns)
+      .set({ status: 'completed', completedAt: new Date() })
+      .where(eq(pipelineRuns.id, runId))
+  } else {
+    // awaiting_review — set completedAt so the UI shows when it stopped
+    await db
+      .update(pipelineRuns)
+      .set({ completedAt: new Date() })
+      .where(eq(pipelineRuns.id, runId))
+  }
 }

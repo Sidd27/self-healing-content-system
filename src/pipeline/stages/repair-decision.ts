@@ -36,8 +36,9 @@ export async function repairDecisionStage(
       .update(pipelineRuns)
       .set({ status: 'awaiting_review' })
       .where(eq(pipelineRuns.id, runId))
-    return { paused: true }
   }
 
-  return { paused: false }
+  // Only high-drift items block Generate — proposals are reviewed separately
+  // (approved proposals spawn their own generate via the review API)
+  return { paused: hasPendingReview }
 }

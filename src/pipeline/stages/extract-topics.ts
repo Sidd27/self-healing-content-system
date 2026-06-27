@@ -65,30 +65,28 @@ export async function extractTopicsStage(
     }
   }
 
-  // Propose new topics from content not covered by existing topics
+  // Always scan for topics not covered by existing ones (existingNames=[] means propose for all content)
   let proposedCount = 0
-  if (sourceTopics.length > 0) {
-    const existingNames = sourceTopics.map(t => t.name)
-    const { output: proposed } = await generateText({
-      model: llmModel,
-      output: Output.object({ schema: ProposedTopicsSchema }),
-      prompt: buildProposeTopicsPrompt(existingNames, normalizedContent),
-      abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-    })
+  const existingNames = sourceTopics.map(t => t.name)
+  const { output: proposed } = await generateText({
+    model: llmModel,
+    output: Output.object({ schema: ProposedTopicsSchema }),
+    prompt: buildProposeTopicsPrompt(existingNames, normalizedContent),
+    abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+  })
 
-    if (proposed.length > 0) {
-      proposedCount = proposed.length
-      await db.insert(proposedTopics).values(
-        proposed.map(p => ({
-          sourceVersionId,
-          pipelineRunId: runId,
-          name: p.name,
-          description: p.description,
-          extractedContent: p.extractedContent,
-          status: 'pending_approval' as const,
-        }))
-      )
-    }
+  if (proposed.length > 0) {
+    proposedCount = proposed.length
+    await db.insert(proposedTopics).values(
+      proposed.map(p => ({
+        sourceVersionId,
+        pipelineRunId: runId,
+        name: p.name,
+        description: p.description,
+        extractedContent: p.extractedContent,
+        status: 'pending_approval' as const,
+      }))
+    )
   }
 
   return { affectedTopicIds, firstRunTopicIds, proposedCount }
