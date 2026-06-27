@@ -2,13 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Database, ClipboardCheck, BookOpen } from 'lucide-react'
+import { Database, GitFork, BookOpen } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 
 const adminLinks = [
   { href: '/admin/sources', label: 'Sources', icon: Database },
-  { href: '/admin/review', label: 'Review Queue', icon: ClipboardCheck },
+  { href: '/admin/pipeline', label: 'Pipelines', icon: GitFork },
 ]
 
 const learnerLinks = [
