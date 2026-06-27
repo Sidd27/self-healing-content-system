@@ -29,7 +29,7 @@ Full design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
 - **Next.js 15** (App Router) + TypeScript
 - **Drizzle ORM** + **Supabase** (Postgres + Storage)
-- **Vercel AI SDK** — provider-agnostic LLM calls (Ollama / OpenRouter / OpenAI)
+- **Mastra AI** — provider-agnostic LLM calls (Ollama / OpenRouter / OpenAI)
 - **shadcn/ui** + Tailwind CSS
 
 ---
@@ -58,14 +58,14 @@ npm install
 cp .env.local.example .env.local
 ```
 
-| Variable | Where to get it |
-|---|---|
-| `DATABASE_URL` | Supabase → Settings → Database → **Transaction pooler** URL (port **6543**) |
-| `SUPABASE_URL` | Supabase → Settings → API → Project URL |
-| `SUPABASE_SECRET_KEY` | Supabase → Settings → API → `service_role` secret |
-| `OPENAI_BASE_URL` | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1` |
-| `LLM_MODEL_NAME` | e.g. `llama3.2:latest` or `meta-llama/llama-3.1-8b-instruct:free` |
-| `LLM_API_KEY` | `ollama` (local) or your OpenRouter key |
+| Variable              | Where to get it                                                             |
+| --------------------- | --------------------------------------------------------------------------- |
+| `DATABASE_URL`        | Supabase → Settings → Database → **Transaction pooler** URL (port **6543**) |
+| `SUPABASE_URL`        | Supabase → Settings → API → Project URL                                     |
+| `SUPABASE_SECRET_KEY` | Supabase → Settings → API → `service_role` secret                           |
+| `OPENAI_BASE_URL`     | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1`      |
+| `LLM_MODEL_NAME`      | e.g. `llama3.2:latest` or `meta-llama/llama-3.1-8b-instruct:free`           |
+| `LLM_API_KEY`         | `ollama` (local) or your OpenRouter key                                     |
 
 ### 3. Supabase storage bucket
 
@@ -96,6 +96,7 @@ ollama pull llama3.2
 ```
 
 `.env.local`:
+
 ```
 OPENAI_BASE_URL=http://localhost:11434/v1
 LLM_MODEL_NAME=llama3.2:latest
@@ -121,12 +122,14 @@ After Extract Topics, the run pauses. Proposed topics appear on the run page —
 ### Simulate drift
 
 Upload a revised version of the source (or paste a different URL) and run again:
+
 - Drift **< 0.75** → auto-healed, new content generated immediately
 - Drift **≥ 0.75** → held for review; approve/reject on the pipeline run page
 
 ### Learner view
 
 **Learner → Browse Topics** → pick a topic:
+
 - **Step 1** — read the lesson
 - **Step 2** — answer MCQ questions; click an option to reveal right/wrong + rationale
 
@@ -134,12 +137,12 @@ Upload a revised version of the source (or paste a different URL) and run again:
 
 ## Admin pages
 
-| Route | Purpose |
-|---|---|
-| `/admin/sources` | List and create sources |
-| `/admin/sources/[id]` | Source detail — upload file, version history, trigger pipeline |
-| `/admin/pipeline` | All pipeline runs across all sources |
-| `/admin/pipeline/[runId]` | Live stage progress + inline approve/reject for pending items |
+| Route                     | Purpose                                                        |
+| ------------------------- | -------------------------------------------------------------- |
+| `/admin/sources`          | List and create sources                                        |
+| `/admin/sources/[id]`     | Source detail — upload file, version history, trigger pipeline |
+| `/admin/pipeline`         | All pipeline runs across all sources                           |
+| `/admin/pipeline/[runId]` | Live stage progress + inline approve/reject for pending items  |
 
 ---
 

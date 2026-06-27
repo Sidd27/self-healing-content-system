@@ -1,76 +1,111 @@
-import { db } from '@/db'
+import { db } from "@/db";
 import {
-  driftItems, topicExtractions, topics, learningUnits,
-  learningUnitVersions, type McqQuestion
-} from '@/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
-import { generateText, Output } from 'ai'
-import { z } from 'zod'
-import { buildGeneratePrompt } from '@/pipeline/prompts'
-import { llmModel } from '@/lib/llm'
-import { LLM_TIMEOUT_MS } from '@/lib/constants'
+  driftItems,
+  topicExtractions,
+  topics,
+  learningUnits,
+  learningUnitVersions,
+  type McqQuestion,
+} from "@/db/schema";
+import { eq, and, desc } from "drizzle-orm";
+import { generateText, Output } from "ai";
+import { z } from "zod";
+import { buildGeneratePrompt } from "@/pipeline/prompts";
+import { llmModel } from "@/lib/llm";
+import { LLM_TIMEOUT_MS } from "@/lib/constants";
+import { log } from "@/lib/logger";
 
 const McqSchema = z.object({
   question: z.string(),
   options: z.array(z.string()),
   correctIndex: z.number().int(),
   rationale: z.string(),
-})
+});
 
 const LearningUnitSchema = z.object({
   lesson: z.string(),
   questions: z.array(McqSchema),
-})
+});
 
 export async function generateStage(
   runId: string,
   sourceVersionId: string,
-  firstRunTopicIds: string[] = []
+  firstRunTopicIds: string[] = [],
 ): Promise<void> {
   const autoAppliedItems = await db
     .select()
     .from(driftItems)
-    .where(and(eq(driftItems.pipelineRunId, runId), eq(driftItems.status, 'auto_applied')))
+    .where(
+      and(
+        eq(driftItems.pipelineRunId, runId),
+        eq(driftItems.status, "auto_applied"),
+      ),
+    );
+
+  log.info("generate", "starting", {
+    autoApplied: autoAppliedItems.length,
+    firstRun: firstRunTopicIds.length,
+  });
 
   for (const item of autoAppliedItems) {
-    await generateForTopic(item.topicId, sourceVersionId, item.driftScore)
+    await generateForTopic(item.topicId, sourceVersionId, item.driftScore);
   }
 
   for (const topicId of firstRunTopicIds) {
-    await generateForTopic(topicId, sourceVersionId, null)
+    await generateForTopic(topicId, sourceVersionId, null);
   }
 }
 
 export async function generateForTopic(
   topicId: string,
   sourceVersionId: string,
-  driftScore: number | null = null
+  driftScore: number | null = null,
 ): Promise<void> {
-  const [topic] = await db.select().from(topics).where(eq(topics.id, topicId))
+  const [topic] = await db.select().from(topics).where(eq(topics.id, topicId));
 
   const [latestExtraction] = await db
     .select()
     .from(topicExtractions)
     .where(eq(topicExtractions.topicId, topicId))
     .orderBy(desc(topicExtractions.createdAt))
-    .limit(1)
+    .limit(1);
+
+  log.info("generate", "generating learning unit", { topic: topic.name, driftScore });
 
   const { output: object } = await generateText({
     model: llmModel,
     output: Output.object({ schema: LearningUnitSchema }),
-    prompt: buildGeneratePrompt(topic.name, topic.description, latestExtraction.extractedContent),
+    prompt: buildGeneratePrompt(
+      topic.name,
+      topic.description,
+      latestExtraction.extractedContent,
+    ),
     abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-  })
+  });
 
-  let [unit] = await db.select().from(learningUnits).where(eq(learningUnits.topicId, topicId)).limit(1)
+  log.info("generate", "LLM generated unit", {
+    topic: topic.name,
+    questions: object.questions.length,
+  });
+
+  let [unit] = await db
+    .select()
+    .from(learningUnits)
+    .where(eq(learningUnits.topicId, topicId))
+    .limit(1);
   if (!unit) {
-    ;[unit] = await db.insert(learningUnits).values({ topicId }).returning()
+    [unit] = await db.insert(learningUnits).values({ topicId }).returning();
   }
 
   await db
     .update(learningUnitVersions)
-    .set({ status: 'archived' })
-    .where(and(eq(learningUnitVersions.learningUnitId, unit.id), eq(learningUnitVersions.status, 'active')))
+    .set({ status: "archived" })
+    .where(
+      and(
+        eq(learningUnitVersions.learningUnitId, unit.id),
+        eq(learningUnitVersions.status, "active"),
+      ),
+    );
 
   await db.insert(learningUnitVersions).values({
     learningUnitId: unit.id,
@@ -78,6 +113,6 @@ export async function generateForTopic(
     lesson: object.lesson,
     questions: object.questions as McqQuestion[],
     driftScore,
-    status: 'active',
-  })
+    status: "active",
+  });
 }

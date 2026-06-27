@@ -1,37 +1,57 @@
-import { db } from '@/db'
-import { topics, topicExtractions, proposedTopics, driftItems } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
-import { generateText, Output } from 'ai'
-import { z } from 'zod'
-import { normalizeContent, hashContent } from '@/lib/normalize'
-import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts'
-import { llmModel } from '@/lib/llm'
-import { LLM_TIMEOUT_MS } from '@/lib/constants'
-import { computeDriftLevel } from './repair-decision'
+import { db } from "@/db";
+import {
+  topics,
+  topicExtractions,
+  proposedTopics,
+  driftItems,
+} from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
+import { generateText, Output } from "ai";
+import { z } from "zod";
+import { normalizeContent, hashContent } from "@/lib/normalize";
+import {
+  buildExtractPrompt,
+  buildProposeTopicsPrompt,
+} from "@/pipeline/prompts";
+import { llmModel } from "@/lib/llm";
+import { LLM_TIMEOUT_MS } from "@/lib/constants";
+import { computeDriftLevel } from "./repair-decision";
+import { log } from "@/lib/logger";
 
 // Wrapped in an object — bare z.array at the top level causes silent empty
 // responses from smaller models with structured output
 const ProposedTopicsSchema = z.object({
-  topics: z.array(z.object({
-    name: z.string(),
-    description: z.string(),
-    extractedContent: z.string(),
-  })),
-})
+  topics: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      extractedContent: z.string(),
+    }),
+  ),
+});
 
 export async function extractTopicsStage(
   runId: string,
   sourceId: string,
   sourceVersionId: string,
-  normalizedContent: string
-): Promise<{ affectedTopicIds: string[]; firstRunTopicIds: string[]; proposedCount: number }> {
+  normalizedContent: string,
+): Promise<{
+  affectedTopicIds: string[];
+  firstRunTopicIds: string[];
+  proposedCount: number;
+}> {
   const sourceTopics = await db
     .select()
     .from(topics)
-    .where(eq(topics.sourceId, sourceId))
+    .where(eq(topics.sourceId, sourceId));
 
-  const affectedTopicIds: string[] = []
-  const firstRunTopicIds: string[] = []
+  log.info("extract_topics", "existing topics", {
+    count: sourceTopics.length,
+    names: sourceTopics.map((t) => t.name),
+  });
+
+  const affectedTopicIds: string[] = [];
+  const firstRunTopicIds: string[] = [];
 
   for (const topic of sourceTopics) {
     const [previousExtraction] = await db
@@ -39,21 +59,31 @@ export async function extractTopicsStage(
       .from(topicExtractions)
       .where(eq(topicExtractions.topicId, topic.id))
       .orderBy(desc(topicExtractions.createdAt))
-      .limit(1)
+      .limit(1);
 
     const { text: extracted } = await generateText({
       model: llmModel,
-      prompt: buildExtractPrompt(topic.name, topic.description, normalizedContent),
+      prompt: buildExtractPrompt(
+        topic.name,
+        topic.description,
+        normalizedContent,
+      ),
       temperature: 0,
       abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-    })
+    });
 
-    const normalizedExtraction = normalizeContent(extracted)
-    const extractionHash = hashContent(normalizedExtraction)
+    const normalizedExtraction = normalizeContent(extracted);
+    const extractionHash = hashContent(normalizedExtraction);
 
     // Skip if hash unchanged from previous extraction
-    if (previousExtraction && extractionHash === previousExtraction.contentHash) {
-      continue
+    if (
+      previousExtraction &&
+      extractionHash === previousExtraction.contentHash
+    ) {
+      log.info("extract_topics", "topic unchanged — skipping", {
+        topic: topic.name,
+      });
+      continue;
     }
 
     await db.insert(topicExtractions).values({
@@ -61,48 +91,62 @@ export async function extractTopicsStage(
       sourceVersionId,
       extractedContent: normalizedExtraction,
       contentHash: extractionHash,
-    })
+    });
 
     if (!previousExtraction) {
-      firstRunTopicIds.push(topic.id)
+      log.info("extract_topics", "first extraction", { topic: topic.name });
+      firstRunTopicIds.push(topic.id);
       // Create a pending_review drift item so repair_decision pauses for human approval
       await db.insert(driftItems).values({
         pipelineRunId: runId,
         topicId: topic.id,
-        changeType: 'FIRST_EXTRACTION',
+        changeType: "FIRST_EXTRACTION",
         driftScore: 0.0,
         driftLevel: computeDriftLevel(0.0),
-        reason: 'First extraction — requires human approval before generating learning unit.',
-        status: 'pending_review',
-      })
+        reason:
+          "First extraction — requires human approval before generating learning unit.",
+        status: "pending_review",
+      });
     } else {
-      affectedTopicIds.push(topic.id)
+      log.info("extract_topics", "content changed — queued for drift analysis", {
+        topic: topic.name,
+      });
+      affectedTopicIds.push(topic.id);
     }
   }
 
+  log.info("extract_topics", "calling LLM to propose new topics", {
+    existingCount: sourceTopics.length,
+  });
+
   // Always scan for topics not covered by existing ones (existingNames=[] means propose for all content)
-  let proposedCount = 0
-  const existingNames = sourceTopics.map(t => t.name)
+  let proposedCount = 0;
+  const existingNames = sourceTopics.map((t) => t.name);
   const { output: proposed } = await generateText({
     model: llmModel,
     output: Output.object({ schema: ProposedTopicsSchema }),
     prompt: buildProposeTopicsPrompt(existingNames, normalizedContent),
     abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-  })
+  });
+
+  log.info("extract_topics", "LLM proposed topics", {
+    count: proposed.topics.length,
+    names: proposed.topics.map((p) => p.name),
+  });
 
   if (proposed.topics.length > 0) {
-    proposedCount = proposed.topics.length
+    proposedCount = proposed.topics.length;
     await db.insert(proposedTopics).values(
-      proposed.topics.map(p => ({
+      proposed.topics.map((p) => ({
         sourceVersionId,
         pipelineRunId: runId,
         name: p.name,
         description: p.description,
         extractedContent: p.extractedContent,
-        status: 'pending_approval' as const,
-      }))
-    )
+        status: "pending_approval" as const,
+      })),
+    );
   }
 
-  return { affectedTopicIds, firstRunTopicIds, proposedCount }
+  return { affectedTopicIds, firstRunTopicIds, proposedCount };
 }

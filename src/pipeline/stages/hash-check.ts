@@ -1,19 +1,20 @@
-import { db } from '@/db'
-import { sourceVersions, pipelineRuns } from '@/db/schema'
-import { eq, desc, and, inArray } from 'drizzle-orm'
+import { db } from "@/db";
+import { sourceVersions, pipelineRuns } from "@/db/schema";
+import { eq, desc, and, inArray } from "drizzle-orm";
+import { log } from "@/lib/logger";
 
 export async function hashCheckStage(
   runId: string,
   sourceId: string,
   hash: string,
-  normalized: string
+  normalized: string,
 ): Promise<{ stopped: boolean; sourceVersionId: string }> {
   const [latest] = await db
     .select()
     .from(sourceVersions)
     .where(eq(sourceVersions.sourceId, sourceId))
     .orderBy(desc(sourceVersions.createdAt))
-    .limit(1)
+    .limit(1);
 
   if (latest && latest.contentHash === hash) {
     // Stop if a prior run with this content version already completed or is awaiting review.
@@ -21,37 +22,49 @@ export async function hashCheckStage(
     const [priorRun] = await db
       .select()
       .from(pipelineRuns)
-      .where(and(
-        eq(pipelineRuns.sourceVersionId, latest.id),
-        inArray(pipelineRuns.status, ['completed', 'awaiting_review'])
-      ))
-      .limit(1)
+      .where(
+        and(
+          eq(pipelineRuns.sourceVersionId, latest.id),
+          inArray(pipelineRuns.status, ["completed", "awaiting_review"]),
+        ),
+      )
+      .limit(1);
 
     if (priorRun) {
+      log.info(
+        "hash_check",
+        "same hash, prior run already processed — stopping",
+        { status: priorRun.status, hash: hash.slice(0, 12) },
+      );
       await db
         .update(pipelineRuns)
-        .set({ status: 'completed', completedAt: new Date() })
-        .where(eq(pipelineRuns.id, runId))
-      return { stopped: true, sourceVersionId: latest.id }
+        .set({ status: "completed", completedAt: new Date() })
+        .where(eq(pipelineRuns.id, runId));
+      return { stopped: true, sourceVersionId: latest.id };
     }
 
-    // Prior run(s) failed — reuse existing version, continue pipeline
+    log.info(
+      "hash_check",
+      "same hash but prior run failed — reusing version, continuing",
+      { hash: hash.slice(0, 12) },
+    );
     await db
       .update(pipelineRuns)
       .set({ sourceVersionId: latest.id })
-      .where(eq(pipelineRuns.id, runId))
-    return { stopped: false, sourceVersionId: latest.id }
+      .where(eq(pipelineRuns.id, runId));
+    return { stopped: false, sourceVersionId: latest.id };
   }
 
+  log.info("hash_check", "new content version", { hash: hash.slice(0, 12) });
   const [newVersion] = await db
     .insert(sourceVersions)
     .values({ sourceId, contentHash: hash, normalizedContent: normalized })
-    .returning()
+    .returning();
 
   await db
     .update(pipelineRuns)
     .set({ sourceVersionId: newVersion.id })
-    .where(eq(pipelineRuns.id, runId))
+    .where(eq(pipelineRuns.id, runId));
 
-  return { stopped: false, sourceVersionId: newVersion.id }
+  return { stopped: false, sourceVersionId: newVersion.id };
 }
