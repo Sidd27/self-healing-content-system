@@ -75,7 +75,13 @@ writePdf('cloud-run-v1.pdf', [
   },
 ], 'Version 1 — baseline')
 
-// ── V2 LOW DRIFT — minor wording edits, same facts ────────────────────────────
+// ── V2 LOW DRIFT — minor wording edits, meaning subtly changed ───────────────
+// Changed facts (should score 0.3–0.6, auto-apply):
+//   • default max instances: 100 → 200
+//   • default concurrency: 80 → 150
+//   • cold start: 1–3 s → typically under 500 ms
+//   • networking: VPC Connector now optional for most use cases
+//   • free tier requests: 2 million → 2.5 million
 
 writePdf('cloud-run-v2-low-drift.pdf', [
   {
@@ -85,8 +91,8 @@ writePdf('cloud-run-v2-low-drift.pdf', [
       'When no requests arrive, Cloud Run scales to zero instances, removing costs during idle time. ' +
       'A minimum instance count can be set to keep containers warm and reduce cold start delays.\n\n' +
       'Maximum instances limit how many containers Cloud Run may start, protecting backend services. ' +
-      'The default maximum remains 100 instances per service. Each instance supports up to 80 concurrent ' +
-      'requests by default, with a maximum of 1000. Cold starts typically take 1–3 seconds.',
+      'The default maximum is now 200 instances per service. Each instance supports up to 150 concurrent ' +
+      'requests by default, with a maximum of 1000. Cold starts typically take under 500 ms.',
   },
   {
     title: 'Networking',
@@ -94,7 +100,8 @@ writePdf('cloud-run-v2-low-drift.pdf', [
       'Cloud Run services are reachable via HTTPS using an automatically generated URL. ' +
       'Custom domains may be configured through Cloud Run domain mapping or via a load balancer.\n\n' +
       'Serverless VPC Access (VPC Connector) enables Cloud Run to communicate with private VPC resources ' +
-      'such as Cloud SQL or Memorystore. Ingress settings control which traffic can reach the service: ' +
+      'such as Cloud SQL or Memorystore, though it is now optional for most standard use cases. ' +
+      'Ingress settings control which traffic can reach the service: ' +
       'All (public), Internal only, or Internal and Cloud Load Balancing.',
   },
   {
@@ -112,9 +119,9 @@ writePdf('cloud-run-v2-low-drift.pdf', [
       '• CPU: billed per vCPU-second while processing requests\n' +
       '• Memory: billed per GiB-second of usage\n' +
       '• Requests: billed per million after the free tier\n\n' +
-      'Monthly free tier covers 2 million requests, 360,000 vCPU-seconds, and 180,000 GiB-seconds.',
+      'Monthly free tier now covers 2.5 million requests, 360,000 vCPU-seconds, and 180,000 GiB-seconds.',
   },
-], 'Version 2 — low drift (minor wording edits only)')
+], 'Version 2 — low drift (minor wording, meaning subtly changed)')
 
 // ── V2 HIGH DRIFT — major factual changes ─────────────────────────────────────
 
