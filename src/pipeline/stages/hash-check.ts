@@ -1,6 +1,6 @@
 import { db } from '@/db'
 import { sourceVersions, pipelineRuns } from '@/db/schema'
-import { eq, desc, and } from 'drizzle-orm'
+import { eq, desc, and, inArray } from 'drizzle-orm'
 
 export async function hashCheckStage(
   runId: string,
@@ -16,15 +16,18 @@ export async function hashCheckStage(
     .limit(1)
 
   if (latest && latest.contentHash === hash) {
-    // Same content — only stop if a prior run actually completed successfully with this version.
-    // If all prior runs failed mid-pipeline, re-run the downstream stages using the existing version.
-    const [successfulRun] = await db
+    // Stop if a prior run with this content version already completed or is awaiting review.
+    // Only continue if all prior runs failed (content processed but pipeline errored out).
+    const [priorRun] = await db
       .select()
       .from(pipelineRuns)
-      .where(and(eq(pipelineRuns.sourceVersionId, latest.id), eq(pipelineRuns.status, 'completed')))
+      .where(and(
+        eq(pipelineRuns.sourceVersionId, latest.id),
+        inArray(pipelineRuns.status, ['completed', 'awaiting_review'])
+      ))
       .limit(1)
 
-    if (successfulRun) {
+    if (priorRun) {
       await db
         .update(pipelineRuns)
         .set({ status: 'completed', completedAt: new Date() })
