@@ -10,15 +10,12 @@ import { driftAnalysisStage } from './stages/drift-analysis'
 import { repairDecisionStage } from './stages/repair-decision'
 import { generateStage } from './stages/generate'
 
-type PipelineFile = { buffer: Buffer; type: 'pdf' | 'md'; content?: string }
-
 export async function runPipeline(
   runId: string,
-  sourceId: string,
-  file?: PipelineFile
+  sourceId: string
 ): Promise<void> {
   const { rawContent } = await runStage(runId, 'ingest', () =>
-    ingestStage(runId, sourceId, file)
+    ingestStage(runId, sourceId)
   )
 
   const { normalized, hash } = await runStage(runId, 'normalize', () =>
