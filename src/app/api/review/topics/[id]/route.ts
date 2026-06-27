@@ -4,6 +4,7 @@ import { proposedTopics, topics, pipelineRuns, topicExtractions } from '@/db/sch
 import { eq } from 'drizzle-orm'
 import { generateForTopic } from '@/pipeline/stages/generate'
 import { normalizeContent, hashContent } from '@/lib/normalize'
+import { tryCompleteRun } from '@/lib/close-run'
 
 export async function POST(
   req: Request,
@@ -20,6 +21,7 @@ export async function POST(
       .update(proposedTopics)
       .set({ status: 'rejected', reviewedAt: new Date() })
       .where(eq(proposedTopics.id, id))
+    await tryCompleteRun(proposed.pipelineRunId)
     return NextResponse.json({ ok: true })
   }
 
@@ -56,6 +58,7 @@ export async function POST(
 
     // Generate learning unit from the proposed content
     await generateForTopic(newTopic.id, proposed.sourceVersionId, null)
+    await tryCompleteRun(proposed.pipelineRunId)
 
     return NextResponse.json({ ok: true })
   }

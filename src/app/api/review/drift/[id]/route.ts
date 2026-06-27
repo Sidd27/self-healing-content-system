@@ -3,6 +3,7 @@ import { db } from '@/db'
 import { driftItems, pipelineRuns } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { generateForTopic } from '@/pipeline/stages/generate'
+import { tryCompleteRun } from '@/lib/close-run'
 
 export async function POST(
   req: Request,
@@ -16,6 +17,7 @@ export async function POST(
 
   if (action === 'reject') {
     await db.update(driftItems).set({ status: 'rejected' }).where(eq(driftItems.id, id))
+    await tryCompleteRun(item.pipelineRunId)
     return NextResponse.json({ ok: true })
   }
 
@@ -27,6 +29,7 @@ export async function POST(
       return NextResponse.json({ error: 'Run not found or has no source version' }, { status: 500 })
     }
     await generateForTopic(item.topicId, run.sourceVersionId, item.driftScore)
+    await tryCompleteRun(item.pipelineRunId)
 
     return NextResponse.json({ ok: true })
   }
