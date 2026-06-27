@@ -64,30 +64,22 @@ export default function SourceDetailPage() {
   async function triggerPipeline() {
     if (!source) return
     setError(null)
+    setRunning(true)
 
-    if (source.type === 'pdf' || source.type === 'md') {
-      if (!selectedFile) { setError('Select a file before running.'); return }
-      setRunning(true)
-      const fd = new FormData()
-      fd.append('file', selectedFile)
-      const res = await fetch(`/api/sources/${id}/pipeline`, { method: 'POST', body: fd })
-      setRunning(false)
-      if (!res.ok) { setError(((await res.json()) as { error?: string }).error ?? 'Pipeline trigger failed.'); return }
-      const { runId } = (await res.json()) as { runId: string }
-      router.push(`/admin/pipeline/${runId}`)
-    } else {
-      setRunning(true)
-      const res = await fetch(`/api/sources/${id}/pipeline`, { method: 'POST' })
-      setRunning(false)
-      if (!res.ok) { setError(((await res.json()) as { error?: string }).error ?? 'Pipeline trigger failed.'); return }
-      const { runId } = (await res.json()) as { runId: string }
-      router.push(`/admin/pipeline/${runId}`)
-    }
+    // Upload a new file only if one was explicitly selected
+    const body = selectedFile ? (() => { const fd = new FormData(); fd.append('file', selectedFile); return fd })() : undefined
+    const res = await fetch(`/api/sources/${id}/pipeline`, { method: 'POST', body })
+    setRunning(false)
+
+    if (!res.ok) { setError(((await res.json()) as { error?: string }).error ?? 'Pipeline trigger failed.'); return }
+    const { runId } = (await res.json()) as { runId: string }
+    router.push(`/admin/pipeline/${runId}`)
   }
 
   if (!source) return <p className="text-muted-foreground text-sm">Loading...</p>
 
-  const needsFile = source.type === 'pdf' || source.type === 'md'
+  // A file is required only when type is pdf/md AND no URL is stored yet
+  const needsFile = (source.type === 'pdf' || source.type === 'md') && !source.url
   const accept = source.type === 'pdf' ? '.pdf' : '.md,.markdown,.txt'
 
   return (
