@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { pipelineRuns, driftItems, topics, topicExtractions } from '@/db/schema'
+import { pipelineRuns, topics, topicExtractions } from '@/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { runStage, skipStage } from './stage-runner'
 import { ingestStage } from './stages/ingest'
