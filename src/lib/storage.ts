@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Secret key (was: service_role) — server-side only, bypasses RLS
 const supabase = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
+  process.env.SUPABASE_SECRET_KEY!,
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
 )
 
 const BUCKET = 'source-files'

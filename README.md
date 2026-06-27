@@ -37,8 +37,8 @@ DATABASE_URL=postgresql://postgres.xxxx:password@aws-1-ap-northeast-2.pooler.sup
 # Supabase — file storage (PDF/MD uploads)
 # Supabase dashboard → Settings → API → Project URL
 SUPABASE_URL=https://xxxx.supabase.co
-# Supabase dashboard → Settings → API → service_role key (secret)
-SUPABASE_SERVICE_KEY=eyJ...
+# Supabase dashboard → Settings → API → secret key (previously called service_role)
+SUPABASE_SECRET_KEY=sb_secret_...
 
 # LLM provider — OpenRouter (cloud) or Ollama (local), pick one:
 #
