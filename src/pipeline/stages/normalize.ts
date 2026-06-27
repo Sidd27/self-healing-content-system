@@ -1,10 +1,11 @@
-import { normalizeContent, hashContent } from '@/lib/normalize'
+import { normalizeContent } from '@/lib/parsers/html';
+import { parsePdf } from '@/lib/parsers/pdf';
 
 export async function normalizeStage(
   _runId: string,
-  rawContent: string
-): Promise<{ normalized: string; hash: string }> {
-  const normalized = normalizeContent(rawContent)
-  const hash = hashContent(normalized)
-  return { normalized, hash }
+  rawContent: string,
+  sourceType: 'html' | 'pdf'
+): Promise<{ normalized: string }> {
+  const normalized = sourceType === 'html' ? normalizeContent(rawContent) : parsePdf(rawContent);
+  return { normalized };
 }

@@ -1,45 +1,45 @@
-'use client'
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+'use client';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from '@/components/ui/dialog';
 
 type Source = {
-  id: string
-  name: string
-  type: 'url' | 'pdf' | 'md'
-  url: string | null
-  createdAt: string
-}
+  id: string;
+  name: string;
+  type: 'html' | 'pdf';
+  url: string | null;
+  createdAt: string;
+};
 
 export default function SourcesPage() {
-  const [sources, setSources] = useState<Source[]>([])
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', type: 'url', url: '' })
-  const [submitting, setSubmitting] = useState(false)
+  const [sources, setSources] = useState<Source[]>([]);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ name: '', type: 'html', url: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   function loadSources() {
     fetch('/api/sources')
       .then((r) => r.json())
       .then(setSources)
-      .catch(console.error)
+      .catch(console.error);
   }
 
   useEffect(() => {
-    loadSources()
-  }, [])
+    loadSources();
+  }, []);
 
   async function addSource(e: React.FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
+    e.preventDefault();
+    setSubmitting(true);
     try {
       await fetch('/api/sources', {
         method: 'POST',
@@ -49,12 +49,12 @@ export default function SourcesPage() {
           type: form.type,
           url: form.url || undefined,
         }),
-      })
-      setOpen(false)
-      setForm({ name: '', type: 'url', url: '' })
-      loadSources()
+      });
+      setOpen(false);
+      setForm({ name: '', type: 'html', url: '' });
+      loadSources();
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
@@ -81,11 +81,10 @@ export default function SourcesPage() {
                 value={form.type}
                 onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
               >
-                <option value="url">URL</option>
+                <option value="html">HTML</option>
                 <option value="pdf">PDF</option>
-                <option value="md">Markdown</option>
               </select>
-              {form.type === 'url' && (
+              {form.type === 'html' && (
                 <input
                   className="w-full border rounded px-3 py-2 text-sm"
                   placeholder="https://example.com/page"
@@ -120,9 +119,7 @@ export default function SourcesPage() {
                 <div className="flex flex-col gap-0.5">
                   <span className="font-medium">{s.name}</span>
                   {s.url && (
-                    <span className="text-xs text-muted-foreground truncate max-w-xs">
-                      {s.url}
-                    </span>
+                    <span className="text-xs text-muted-foreground truncate max-w-xs">{s.url}</span>
                   )}
                 </div>
                 <Badge variant="outline">{s.type.toUpperCase()}</Badge>
@@ -135,5 +132,5 @@ export default function SourcesPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

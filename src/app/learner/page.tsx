@@ -1,32 +1,32 @@
-'use client'
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+'use client';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 type TopicEntry = {
-  topic: { id: string; name: string; description: string }
-  source: { name: string; type: string }
-}
+  topic: { id: string; name: string; description: string };
+  source: { name: string; type: string };
+};
 
 export default function LearnerPage() {
-  const [entries, setEntries] = useState<TopicEntry[]>([])
+  const [entries, setEntries] = useState<TopicEntry[]>([]);
 
   useEffect(() => {
     fetch('/api/topics/all')
-      .then(r => r.json())
-      .then(setEntries)
-  }, [])
+      .then((r) => r.json())
+      .then(setEntries);
+  }, []);
 
   // Group by source name
   const grouped = entries.reduce<Record<string, TopicEntry[]>>((acc, entry) => {
-    const key = entry.source.name
-    if (!acc[key]) acc[key] = []
-    acc[key].push(entry)
-    return acc
-  }, {})
+    const key = entry.source.name;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(entry);
+    return acc;
+  }, {});
 
-  const sourceNames = Object.keys(grouped)
+  const sourceNames = Object.keys(grouped);
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -38,7 +38,7 @@ export default function LearnerPage() {
         </p>
       )}
 
-      {sourceNames.map(sourceName => (
+      {sourceNames.map((sourceName) => (
         <section key={sourceName} className="space-y-2">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-medium">{sourceName}</h2>
@@ -65,5 +65,5 @@ export default function LearnerPage() {
         </section>
       ))}
     </div>
-  )
+  );
 }

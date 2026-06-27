@@ -1,14 +1,15 @@
-import { db } from "@/db";
-import { sourceVersions, pipelineRuns } from "@/db/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
-import { log } from "@/lib/logger";
+import { db } from '@/db';
+import { sourceVersions, pipelineRuns } from '@/db/schema';
+import { eq, desc, and, inArray } from 'drizzle-orm';
+import { hashContent } from '@/lib/utils';
+import { log } from '@/lib/logger';
 
 export async function hashCheckStage(
   runId: string,
   sourceId: string,
-  hash: string,
-  normalized: string,
+  normalized: string
 ): Promise<{ stopped: boolean; sourceVersionId: string }> {
+  const hash = hashContent(normalized);
   const [latest] = await db
     .select()
     .from(sourceVersions)
@@ -25,29 +26,26 @@ export async function hashCheckStage(
       .where(
         and(
           eq(pipelineRuns.sourceVersionId, latest.id),
-          inArray(pipelineRuns.status, ["completed", "awaiting_review"]),
-        ),
+          inArray(pipelineRuns.status, ['completed', 'awaiting_review'])
+        )
       )
       .limit(1);
 
     if (priorRun) {
-      log.info(
-        "hash_check",
-        "same hash, prior run already processed — stopping",
-        { status: priorRun.status, hash: hash.slice(0, 12) },
-      );
+      log.info('hash_check', 'same hash, prior run already processed — stopping', {
+        status: priorRun.status,
+        hash: hash.slice(0, 12),
+      });
       await db
         .update(pipelineRuns)
-        .set({ status: "completed", completedAt: new Date() })
+        .set({ status: 'completed', completedAt: new Date() })
         .where(eq(pipelineRuns.id, runId));
       return { stopped: true, sourceVersionId: latest.id };
     }
 
-    log.info(
-      "hash_check",
-      "same hash but prior run failed — reusing version, continuing",
-      { hash: hash.slice(0, 12) },
-    );
+    log.info('hash_check', 'same hash but prior run failed — reusing version, continuing', {
+      hash: hash.slice(0, 12),
+    });
     await db
       .update(pipelineRuns)
       .set({ sourceVersionId: latest.id })
@@ -55,7 +53,7 @@ export async function hashCheckStage(
     return { stopped: false, sourceVersionId: latest.id };
   }
 
-  log.info("hash_check", "new content version", { hash: hash.slice(0, 12) });
+  log.info('hash_check', 'new content version', { hash: hash.slice(0, 12) });
   const [newVersion] = await db
     .insert(sourceVersions)
     .values({ sourceId, contentHash: hash, normalizedContent: normalized })

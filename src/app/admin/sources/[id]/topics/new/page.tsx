@@ -1,27 +1,27 @@
-'use client'
-import { useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+'use client';
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function NewTopicPage() {
-  const { id } = useParams<{ id: string }>()
-  const router = useRouter()
-  const [form, setForm] = useState({ name: '', description: '' })
-  const [submitting, setSubmitting] = useState(false)
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [form, setForm] = useState({ name: '', description: '' });
+  const [submitting, setSubmitting] = useState(false);
 
   async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
+    e.preventDefault();
+    setSubmitting(true);
     try {
       await fetch('/api/topics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceId: id, ...form }),
-      })
-      router.push(`/admin/sources/${id}`)
+      });
+      router.push(`/admin/sources/${id}`);
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
@@ -53,5 +53,5 @@ export default function NewTopicPage() {
         </form>
       </CardContent>
     </Card>
-  )
+  );
 }

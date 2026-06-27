@@ -1,21 +1,19 @@
-import { db } from "@/db";
-import { topics, topicExtractions, driftItems } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { generateText, Output } from "ai";
-import { z } from "zod";
-import { buildDriftPrompt } from "@/pipeline/prompts";
-import { computeDriftLevel, computeRepairDecision } from "./repair-decision";
-import { llmModel } from "@/lib/llm";
-import { LLM_TIMEOUT_MS } from "@/lib/constants";
-import { log } from "@/lib/logger";
+import { db } from '@/db';
+import { topics, topicExtractions, driftItems } from '@/db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { z } from 'zod';
+import { buildDriftPrompt } from '@/pipeline/prompts';
+import { computeDriftLevel, computeRepairDecision } from './repair-decision';
+import { log } from '@/lib/logger';
+import { driftAgent } from '@/mastra';
 
 const DriftAnalysisSchema = z.object({
   changeType: z.enum([
-    "NO_CHANGE",
-    "MINOR_EDIT",
-    "SEMANTIC_CHANGE",
-    "MAJOR_RESTRUCTURE",
-    "CONTENT_REMOVED",
+    'NO_CHANGE',
+    'MINOR_EDIT',
+    'SEMANTIC_CHANGE',
+    'MAJOR_RESTRUCTURE',
+    'CONTENT_REMOVED',
   ]),
   driftScore: z.number().min(0).max(1),
   requiresRepair: z.boolean(),
@@ -25,13 +23,10 @@ const DriftAnalysisSchema = z.object({
 export async function driftAnalysisStage(
   runId: string,
   affectedTopicIds: string[],
-  sourceVersionId: string,
+  sourceVersionId: string
 ): Promise<void> {
   for (const topicId of affectedTopicIds) {
-    const [topic] = await db
-      .select()
-      .from(topics)
-      .where(eq(topics.id, topicId));
+    const [topic] = await db.select().from(topics).where(eq(topics.id, topicId));
 
     const extractions = await db
       .select()
@@ -44,17 +39,15 @@ export async function driftAnalysisStage(
     const newContent = extractions[0].extractedContent;
     const oldContent = extractions[1].extractedContent;
 
-    const { output: object } = await generateText({
-      model: llmModel,
-      output: Output.object({ schema: DriftAnalysisSchema }),
-      prompt: buildDriftPrompt(topic.name, oldContent, newContent),
-      abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-    });
+    const { object } = await driftAgent.generate(
+      buildDriftPrompt(topic.name, oldContent, newContent),
+      { structuredOutput: { schema: DriftAnalysisSchema } }
+    );
 
     const driftLevel = computeDriftLevel(object.driftScore);
     const status = computeRepairDecision(object.driftScore);
 
-    log.info("drift_analysis", "topic drift result", {
+    log.info('drift_analysis', 'topic drift result', {
       topic: topic.name,
       changeType: object.changeType,
       driftScore: object.driftScore,

@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { driftItems, proposedTopics, topics, pipelineRuns } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { driftItems, proposedTopics, topics, pipelineRuns } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET() {
   const pendingDrift = await db
@@ -9,12 +9,12 @@ export async function GET() {
     .from(driftItems)
     .innerJoin(topics, eq(driftItems.topicId, topics.id))
     .innerJoin(pipelineRuns, eq(driftItems.pipelineRunId, pipelineRuns.id))
-    .where(eq(driftItems.status, 'pending_review'))
+    .where(eq(driftItems.status, 'pending_review'));
 
   const pendingTopics = await db
     .select()
     .from(proposedTopics)
-    .where(eq(proposedTopics.status, 'pending_approval'))
+    .where(eq(proposedTopics.status, 'pending_approval'));
 
-  return NextResponse.json({ pendingDrift, pendingTopics })
+  return NextResponse.json({ pendingDrift, pendingTopics });
 }

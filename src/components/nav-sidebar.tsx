@@ -1,22 +1,20 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Database, GitFork, BookOpen } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
-import { cn } from '@/lib/utils'
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Database, GitFork, BookOpen } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 const adminLinks = [
   { href: '/admin/sources', label: 'Sources', icon: Database },
   { href: '/admin/pipeline', label: 'Pipelines', icon: GitFork },
-]
+];
 
-const learnerLinks = [
-  { href: '/learner', label: 'Browse Topics', icon: BookOpen },
-]
+const learnerLinks = [{ href: '/learner', label: 'Browse Topics', icon: BookOpen }];
 
 export function NavSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <nav className="w-56 flex-shrink-0 border-r bg-sidebar p-4 flex flex-col gap-1">
@@ -58,5 +56,5 @@ export function NavSidebar() {
         </Link>
       ))}
     </nav>
-  )
+  );
 }

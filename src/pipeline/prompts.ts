@@ -18,7 +18,7 @@ Copy the text VERBATIM — do not paraphrase, summarize, reorder, or add any wor
 If a passage is relevant, copy it exactly as it appears.
 If nothing in the source is relevant to this topic, return an empty string.
 
-Return only the extracted passages, nothing else.`
+Return only the extracted passages, nothing else.`;
 }
 
 export function buildDriftPrompt(
@@ -44,7 +44,7 @@ Analyze the semantic difference. Return a JSON object with:
 - changeType: one of "NO_CHANGE" | "MINOR_EDIT" | "SEMANTIC_CHANGE" | "MAJOR_RESTRUCTURE" | "CONTENT_REMOVED"
 - driftScore: float 0.0 to 1.0 (0 = identical meaning, 1 = completely different)
 - requiresRepair: boolean (true if learning content grounded in this topic needs updating)
-- reason: one sentence explaining the most significant change`
+- reason: one sentence explaining the most significant change`;
 }
 
 export function buildGeneratePrompt(
@@ -66,20 +66,18 @@ Generate a JSON object with exactly these fields:
 - lesson: a clear, concise explanation of the key concept a learner must understand (2-4 sentences)
 - questions: an array of MCQ questions. Generate as many as the content depth warrants — more content means more questions, shallow content means fewer. Each question must have:
   - question: the question text
-  - options: array of answer strings (typically 4, but match what makes sense for the question)
-  - correctIndex: zero-based index of the correct option
+  - options: array of exactly 4 answer strings. The correct answer MUST be one of these 4 strings. The other 3 must be plausible but incorrect distractors.
+  - correctIndex: zero-based index (0–3) pointing to the correct answer within the options array. Double-check that options[correctIndex] is indeed the correct answer before finalising.
   - rationale: one sentence explaining why that option is correct, grounded in the source
 
-All content must come only from the provided source.`
+All content must come only from the provided source.`;
 }
 
-export function buildProposeTopicsPrompt(
-  existingTopicNames: string[],
-  newContent: string
-): string {
-  const existingSection = existingTopicNames.length > 0
-    ? `Topics already covered (do NOT re-propose these):\n${existingTopicNames.map(n => `- ${n}`).join('\n')}`
-    : `No topics have been defined yet. You must identify all significant topics from the content.`
+export function buildProposeTopicsPrompt(existingTopicNames: string[], newContent: string): string {
+  const existingSection =
+    existingTopicNames.length > 0
+      ? `Topics already covered (do NOT re-propose these):\n${existingTopicNames.map((n) => `- ${n}`).join('\n')}`
+      : `No topics have been defined yet. You must identify all significant topics from the content.`;
 
   return `You are identifying learning topics from source content for a professional certification exam.
 
@@ -96,8 +94,9 @@ Each object must have:
 - description: one sentence describing what this topic covers
 - extractedContent: verbatim passages from the content relevant to this topic
 
-${existingTopicNames.length === 0
-  ? 'Identify all significant topics a learner would need to know. Return at least 3 topics if the content is substantive.'
-  : 'Only include topics NOT already in the existing list. Return an empty array if nothing new is found.'
-}`
+${
+  existingTopicNames.length === 0
+    ? 'Identify all significant topics a learner would need to know. Return at least 3 topics if the content is substantive.'
+    : 'Only include topics NOT already in the existing list. Return an empty array if nothing new is found.'
+}`;
 }

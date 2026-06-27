@@ -1,24 +1,20 @@
-import { db } from "@/db";
-import { driftItems, pipelineRuns, proposedTopics } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { DRIFT_HIGH_THRESHOLD } from "@/lib/constants";
-import { log } from "@/lib/logger";
+import { db } from '@/db';
+import { driftItems, pipelineRuns, proposedTopics } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { DRIFT_HIGH_THRESHOLD } from '@/lib/constants';
+import { log } from '@/lib/logger';
 
-export function computeDriftLevel(score: number): "low" | "med" | "high" {
-  if (score >= DRIFT_HIGH_THRESHOLD) return "high";
-  if (score >= 0.5) return "med";
-  return "low";
+export function computeDriftLevel(score: number): 'low' | 'med' | 'high' {
+  if (score >= DRIFT_HIGH_THRESHOLD) return 'high';
+  if (score >= 0.5) return 'med';
+  return 'low';
 }
 
-export function computeRepairDecision(
-  score: number,
-): "auto_applied" | "pending_review" {
-  return score >= DRIFT_HIGH_THRESHOLD ? "pending_review" : "auto_applied";
+export function computeRepairDecision(score: number): 'auto_applied' | 'pending_review' {
+  return score >= DRIFT_HIGH_THRESHOLD ? 'pending_review' : 'auto_applied';
 }
 
-export async function repairDecisionStage(
-  runId: string,
-): Promise<{ paused: boolean }> {
+export async function repairDecisionStage(runId: string): Promise<{ paused: boolean }> {
   const runDriftItems = await db
     .select()
     .from(driftItems)
@@ -29,12 +25,10 @@ export async function repairDecisionStage(
     .from(proposedTopics)
     .where(eq(proposedTopics.pipelineRunId, runId));
 
-  const hasPendingReview = runDriftItems.some(
-    (d) => d.status === "pending_review",
-  );
+  const hasPendingReview = runDriftItems.some((d) => d.status === 'pending_review');
   const hasPendingTopics = runProposedTopics.length > 0;
 
-  log.info("repair_decision", "decision", {
+  log.info('repair_decision', 'decision', {
     driftItems: runDriftItems.length,
     pendingReview: hasPendingReview,
     proposedTopics: runProposedTopics.length,
@@ -45,7 +39,7 @@ export async function repairDecisionStage(
   if (hasPendingReview || hasPendingTopics) {
     await db
       .update(pipelineRuns)
-      .set({ status: "awaiting_review" })
+      .set({ status: 'awaiting_review' })
       .where(eq(pipelineRuns.id, runId));
   }
 

@@ -1,40 +1,34 @@
-import { describe, it, expect } from 'vitest'
-import { normalizeContent, hashContent } from '../../src/lib/normalize'
+import { describe, it, expect } from 'vitest';
+import { normalizeText, hashContent } from '../../src/lib/utils';
 
-describe('normalizeContent', () => {
-  it('strips HTML tags', () => {
-    expect(normalizeContent('<p>Hello <b>world</b></p>')).toBe('hello world')
-  })
-
+describe('normalizeText', () => {
   it('collapses whitespace', () => {
-    expect(normalizeContent('hello   \n\t  world')).toBe('hello world')
-  })
+    expect(normalizeText('hello   \n\t  world')).toBe('hello world');
+  });
 
   it('lowercases', () => {
-    expect(normalizeContent('Cloud Run AUTOSCALING')).toBe('cloud run autoscaling')
-  })
+    expect(normalizeText('Cloud Run AUTOSCALING')).toBe('cloud run autoscaling');
+  });
 
   it('trims', () => {
-    expect(normalizeContent('  hello  ')).toBe('hello')
-  })
-})
+    expect(normalizeText('  hello  ')).toBe('hello');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(normalizeText('')).toBe('');
+  });
+});
 
 describe('hashContent', () => {
   it('returns same hash for same content', () => {
-    const a = hashContent('cloud run autoscaling supports 1000 instances')
-    const b = hashContent('cloud run autoscaling supports 1000 instances')
-    expect(a).toBe(b)
-  })
+    expect(hashContent('cloud run autoscaling')).toBe(hashContent('cloud run autoscaling'));
+  });
 
   it('returns different hash for different content', () => {
-    const a = hashContent('supports 1000 instances')
-    const b = hashContent('supports 100 instances')
-    expect(a).not.toBe(b)
-  })
+    expect(hashContent('supports 1000 instances')).not.toBe(hashContent('supports 100 instances'));
+  });
 
-  it('is insensitive to extra whitespace before hashing', () => {
-    const a = hashContent('hello  world')
-    const b = hashContent('hello world')
-    expect(a).toBe(b)
-  })
-})
+  it('is insensitive to extra whitespace', () => {
+    expect(hashContent('hello  world')).toBe(hashContent('hello world'));
+  });
+});

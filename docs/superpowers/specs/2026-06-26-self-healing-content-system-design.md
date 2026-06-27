@@ -13,16 +13,16 @@ A system that keeps AI-generated learning content accurate as source materials c
 
 ## Tech Stack
 
-| Layer | Choice |
-|---|---|
+| Layer              | Choice                  |
+| ------------------ | ----------------------- |
 | Frontend + Backend | Next.js 15 (App Router) |
-| Language | TypeScript |
-| UI | Shadcn + Tailwind |
-| Database | Supabase (Postgres) |
-| ORM | Drizzle |
-| AI | OpenRouter |
-| Agent Framework | Mastra |
-| Deployment | Vercel |
+| Language           | TypeScript              |
+| UI                 | Shadcn + Tailwind       |
+| Database           | Supabase (Postgres)     |
+| ORM                | Drizzle                 |
+| AI                 | OpenRouter              |
+| Agent Framework    | Mastra                  |
+| Deployment         | Vercel                  |
 
 Pipeline is **on-demand only** — triggered manually via UI button. No scheduler.
 
@@ -116,7 +116,9 @@ Each level only proceeds if its hash changed. Hashing uses **MD5** (Node built-i
 A **Mastra workflow** with 7 stages. Each stage writes its output to Supabase before passing control to the next. On failure, `pipeline_stages.error` captures it and the run is resumable from that stage.
 
 ### Stage 1 — Ingest
+
 Each source type has its own extractor:
+
 - **URL** → fetch HTML, strip tags, extract body text
 - **PDF** → pdf-parse (or similar) to extract plain text from binary
 - **MD** → strip markdown syntax, extract plain text
@@ -126,12 +128,14 @@ Content length is checked after extraction. If it exceeds a defined cap, the sta
 Output: raw content string
 
 ### Stage 2 — Normalize
+
 - Deterministic: strip HTML, normalize whitespace, lowercase
 - Output: `normalized_content` (stored as-is, readable) + MD5 `content_hash`
 - Hash input: `normalized_content` passed through an aggressive local formatter first — collapse all whitespace to single space, trim — before hashing. This intermediate form is never stored.
 - Same two-step pattern (store readable, hash aggressively normalized) reused for topic extraction hashing in Stage 4.
 
 ### Stage 3 — Hash Check
+
 ```
 query latest source_version for this source
 ├── no previous version → first run, create source_version row, proceed
@@ -140,7 +144,9 @@ query latest source_version for this source
 ```
 
 ### Stage 4 — Extract Topics
+
 For each existing topic:
+
 - LLM extracts **verbatim passages** relevant to the topic (`temperature=0`, no summarization)
 - `normalize(extracted_content)` → MD5 hash
 - Compare vs previous `topic_extractions.content_hash`
@@ -153,10 +159,13 @@ Separately: LLM scans new/changed content for sections not covered by any existi
 > ponytail: verbatim extraction + temp=0 keeps hashing deterministic. Upgrade to embedding cosine similarity if false negatives appear (semantic shifts not captured by verbatim extraction — e.g. added negation that changes meaning without changing surrounding text).
 
 ### Stage 5 — Drift Analysis
+
 For each affected topic only:
+
 - LLM receives: `old extracted_content` vs `new extracted_content`
 - Response validated with Zod schema before proceeding — malformed output fails the stage cleanly with error captured in `pipeline_stages.error`
 - Expected shape:
+
 ```json
 {
   "changeType": "SEMANTIC_CHANGE",
@@ -165,9 +174,11 @@ For each affected topic only:
   "reason": "Maximum instance limit changed."
 }
 ```
+
 - Creates `drift_items` row with `drift_level` derived from `driftScore`
 
 ### Stage 6 — Repair Decision
+
 ```
 drift_score < 0.75 → auto_applied → proceed to Generate
 drift_score ≥ 0.75 → pending_review → pipeline suspends (Mastra step suspension)
@@ -175,15 +186,19 @@ any proposed_topics → pipeline_run.status = awaiting_review
 ```
 
 ### Stage 7 — Generate
+
 For each `auto_applied` drift item:
+
 - LLM generates `question + rationale + lesson` from new `extracted_content`
 - New `learning_unit_versions` row (`status: active`)
 - Previous version → `archived`
 
 ### Within-stage execution
+
 Topics are processed sequentially within each stage. Stages 4 and 7 can later fan out per-topic in parallel (Mastra parallel steps) if topic count grows.
 
 ### Human review resume paths
+
 ```
 Approve high-drift item  → trigger Generate for that drift_item (within same pipeline_run)
 Approve proposed_topic   → topic created → spawns new pipeline_run (Extract + Generate only for that topic)
@@ -194,11 +209,11 @@ Reject either            → marked rejected, nothing generated
 
 ## Source Type Behaviour
 
-| Type | How new content arrives | Change detection |
-|---|---|---|
-| URL | Re-fetch same URL on pipeline trigger | Hash compare — same hash stops pipeline |
-| PDF | User uploads new file on pipeline trigger | Hash compare — same hash stops pipeline |
-| MD | User uploads new file on pipeline trigger | Hash compare — same hash stops pipeline |
+| Type | How new content arrives                   | Change detection                        |
+| ---- | ----------------------------------------- | --------------------------------------- |
+| URL  | Re-fetch same URL on pipeline trigger     | Hash compare — same hash stops pipeline |
+| PDF  | User uploads new file on pipeline trigger | Hash compare — same hash stops pipeline |
+| MD   | User uploads new file on pipeline trigger | Hash compare — same hash stops pipeline |
 
 A different URL = a new source entirely, not a new version.
 
@@ -209,17 +224,19 @@ A different URL = a new source entirely, not a new version.
 Left nav, two sections, no auth required.
 
 ### Admin
-| Screen | Purpose |
-|---|---|
-| Sources | List sources, add new (URL/PDF/MD), trigger pipeline per source |
-| Source detail | Version history, topics list, pipeline run history |
-| Pipeline run | Live stage progress, drift items per topic, repair decision status |
-| Review queue | High-drift approvals + proposed topic approvals |
+
+| Screen        | Purpose                                                            |
+| ------------- | ------------------------------------------------------------------ |
+| Sources       | List sources, add new (URL/PDF/MD), trigger pipeline per source    |
+| Source detail | Version history, topics list, pipeline run history                 |
+| Pipeline run  | Live stage progress, drift items per topic, repair decision status |
+| Review queue  | High-drift approvals + proposed topic approvals                    |
 
 ### Learner
-| Screen | Purpose |
-|---|---|
-| Browse topics | Topics listed per source |
+
+| Screen        | Purpose                                                                           |
+| ------------- | --------------------------------------------------------------------------------- |
+| Browse topics | Topics listed per source                                                          |
 | Learning unit | Question → reveal rationale → reveal lesson; version badge showing source version |
 
 Learner section shows only `active` learning unit versions.
@@ -230,12 +247,12 @@ Learner section shows only `active` learning unit versions.
 
 The system is designed so human effort scales with change severity:
 
-| Drift level | Score | Action |
-|---|---|---|
-| Low | < 0.50 | Auto-apply, no human needed |
-| Medium | 0.50 – 0.74 | Auto-apply, no human needed |
-| High | ≥ 0.75 | Human approves before Generate runs |
-| New content | — | Human always approves proposed topics |
+| Drift level | Score       | Action                                |
+| ----------- | ----------- | ------------------------------------- |
+| Low         | < 0.50      | Auto-apply, no human needed           |
+| Medium      | 0.50 – 0.74 | Auto-apply, no human needed           |
+| High        | ≥ 0.75      | Human approves before Generate runs   |
+| New content | —           | Human always approves proposed topics |
 
 > ponytail: thresholds hardcoded as constants. Add a config table if they need per-source tuning.
 

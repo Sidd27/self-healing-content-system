@@ -1,4 +1,4 @@
-const DEBUG = process.env.DEBUG_LOGS === "true";
+const DEBUG = process.env.DEBUG_LOGS === 'true';
 
 export const log = {
   info(stage: string, msg: string, data?: Record<string, unknown>) {
@@ -8,6 +8,6 @@ export const log = {
   },
   error(stage: string, msg: string, err?: unknown) {
     // errors always surface regardless of DEBUG flag
-    console.error(`[log:${stage}] ERROR: ${msg}`, err ?? "");
+    console.error(`[log:${stage}] ERROR: ${msg}`, err ?? '');
   },
 };

@@ -1,9 +1,9 @@
-import { loadEnvConfig } from '@next/env'
-loadEnvConfig(process.cwd())
+import { loadEnvConfig } from '@next/env';
+loadEnvConfig(process.cwd());
 
-import postgres from 'postgres'
+import postgres from 'postgres';
 
-const client = postgres(process.env.DATABASE_URL!, { ssl: 'require', prepare: false })
+const client = postgres(process.env.DATABASE_URL!, { ssl: 'require', prepare: false });
 
 async function main() {
   await client`TRUNCATE TABLE
@@ -17,9 +17,12 @@ async function main() {
     source_versions,
     topics,
     sources
-  CASCADE`
-  console.log('All tables truncated.')
-  await client.end()
+  CASCADE`;
+  console.log('All tables truncated.');
+  await client.end();
 }
 
-main().catch(err => { console.error(err); process.exit(1) })
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

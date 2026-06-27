@@ -1,11 +1,11 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { NavSidebar } from '@/components/nav-sidebar'
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { NavSidebar } from '@/components/nav-sidebar';
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ['latin'] });
 
-export const metadata: Metadata = { title: 'Self-Healing Content System' }
+export const metadata: Metadata = { title: 'Self-Healing Content System' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,5 +15,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </body>
     </html>
-  )
+  );
 }

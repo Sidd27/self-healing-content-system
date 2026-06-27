@@ -92,12 +92,14 @@ tests/
 ## Task 1: Project Bootstrap
 
 **Files:**
+
 - Create: `package.json` (via create-next-app)
 - Create: `vitest.config.ts`
 - Create: `.env.local`
 - Create: `drizzle.config.ts`
 
 **Interfaces:**
+
 - Produces: runnable Next.js 15 dev server at `localhost:3000`
 
 - [ ] **Step 1: Scaffold Next.js project**
@@ -134,13 +136,13 @@ npx shadcn@latest add button card badge table dialog separator tabs
 
 ```typescript
 // vitest.config.ts
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
   },
-})
+});
 ```
 
 - [ ] **Step 5: Write .env.local**
@@ -155,13 +157,13 @@ OPENROUTER_API_KEY=sk-or-...
 
 ```typescript
 // drizzle.config.ts
-import { defineConfig } from 'drizzle-kit'
+import { defineConfig } from 'drizzle-kit';
 export default defineConfig({
   schema: './src/db/schema.ts',
   out: './drizzle/migrations',
   dialect: 'postgresql',
   dbCredentials: { url: process.env.DATABASE_URL! },
-})
+});
 ```
 
 - [ ] **Step 7: Verify dev server starts**
@@ -185,10 +187,12 @@ git commit -m "feat: bootstrap Next.js 15 project with deps and tooling"
 ## Task 2: Database Schema + Migrations
 
 **Files:**
+
 - Create: `src/db/schema.ts`
 - Create: `src/db/index.ts`
 
 **Interfaces:**
+
 - Produces: `db` export from `src/db/index.ts` — Drizzle instance ready for all tasks
 - Produces: all table exports from `src/db/schema.ts` used by every pipeline stage
 
@@ -196,31 +200,48 @@ git commit -m "feat: bootstrap Next.js 15 project with deps and tooling"
 
 ```typescript
 // src/db/schema.ts
-import {
-  pgTable, pgEnum, uuid, text, timestamp, real, boolean
-} from 'drizzle-orm/pg-core'
+import { pgTable, pgEnum, uuid, text, timestamp, real, boolean } from 'drizzle-orm/pg-core';
 
-export const sourceTypeEnum = pgEnum('source_type', ['url', 'pdf', 'md'])
+export const sourceTypeEnum = pgEnum('source_type', ['url', 'pdf']);
 export const pipelineStatusEnum = pgEnum('pipeline_status', [
-  'running', 'completed', 'failed', 'awaiting_review'
-])
+  'running',
+  'completed',
+  'failed',
+  'awaiting_review',
+]);
 export const stageNameEnum = pgEnum('stage_name', [
-  'ingest', 'normalize', 'hash_check', 'extract_topics',
-  'drift_analysis', 'repair_decision', 'generate'
-])
+  'ingest',
+  'normalize',
+  'hash_check',
+  'extract_topics',
+  'drift_analysis',
+  'repair_decision',
+  'generate',
+]);
 export const stageStatusEnum = pgEnum('stage_status', [
-  'pending', 'running', 'completed', 'failed', 'skipped'
-])
-export const driftLevelEnum = pgEnum('drift_level', ['low', 'med', 'high'])
+  'pending',
+  'running',
+  'completed',
+  'failed',
+  'skipped',
+]);
+export const driftLevelEnum = pgEnum('drift_level', ['low', 'med', 'high']);
 export const driftItemStatusEnum = pgEnum('drift_item_status', [
-  'auto_applied', 'pending_review', 'approved', 'rejected'
-])
+  'auto_applied',
+  'pending_review',
+  'approved',
+  'rejected',
+]);
 export const proposedTopicStatusEnum = pgEnum('proposed_topic_status', [
-  'pending_approval', 'approved', 'rejected'
-])
+  'pending_approval',
+  'approved',
+  'rejected',
+]);
 export const learningUnitStatusEnum = pgEnum('learning_unit_status', [
-  'active', 'pending_review', 'archived'
-])
+  'active',
+  'pending_review',
+  'archived',
+]);
 
 export const sources = pgTable('sources', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -228,107 +249,133 @@ export const sources = pgTable('sources', {
   type: sourceTypeEnum('type').notNull(),
   url: text('url'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+});
 
 export const sourceVersions = pgTable('source_versions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  sourceId: uuid('source_id').notNull().references(() => sources.id),
+  sourceId: uuid('source_id')
+    .notNull()
+    .references(() => sources.id),
   contentHash: text('content_hash').notNull(),
   normalizedContent: text('normalized_content').notNull(),
   storagePath: text('storage_path'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+});
 
 export const topics = pgTable('topics', {
   id: uuid('id').primaryKey().defaultRandom(),
-  sourceId: uuid('source_id').notNull().references(() => sources.id),
+  sourceId: uuid('source_id')
+    .notNull()
+    .references(() => sources.id),
   name: text('name').notNull(),
   description: text('description').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+});
 
 export const topicExtractions = pgTable('topic_extractions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  topicId: uuid('topic_id').notNull().references(() => topics.id),
-  sourceVersionId: uuid('source_version_id').notNull().references(() => sourceVersions.id),
+  topicId: uuid('topic_id')
+    .notNull()
+    .references(() => topics.id),
+  sourceVersionId: uuid('source_version_id')
+    .notNull()
+    .references(() => sourceVersions.id),
   extractedContent: text('extracted_content').notNull(),
   contentHash: text('content_hash').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+});
 
 export const proposedTopics = pgTable('proposed_topics', {
   id: uuid('id').primaryKey().defaultRandom(),
-  sourceVersionId: uuid('source_version_id').notNull().references(() => sourceVersions.id),
-  pipelineRunId: uuid('pipeline_run_id').notNull().references(() => pipelineRuns.id),
+  sourceVersionId: uuid('source_version_id')
+    .notNull()
+    .references(() => sourceVersions.id),
+  pipelineRunId: uuid('pipeline_run_id')
+    .notNull()
+    .references(() => pipelineRuns.id),
   name: text('name').notNull(),
   description: text('description').notNull(),
   extractedContent: text('extracted_content').notNull(),
   status: proposedTopicStatusEnum('status').notNull().default('pending_approval'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   reviewedAt: timestamp('reviewed_at'),
-})
+});
 
 export const learningUnits = pgTable('learning_units', {
   id: uuid('id').primaryKey().defaultRandom(),
-  topicId: uuid('topic_id').notNull().references(() => topics.id),
+  topicId: uuid('topic_id')
+    .notNull()
+    .references(() => topics.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+});
 
 export const learningUnitVersions = pgTable('learning_unit_versions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  learningUnitId: uuid('learning_unit_id').notNull().references(() => learningUnits.id),
-  sourceVersionId: uuid('source_version_id').notNull().references(() => sourceVersions.id),
+  learningUnitId: uuid('learning_unit_id')
+    .notNull()
+    .references(() => learningUnits.id),
+  sourceVersionId: uuid('source_version_id')
+    .notNull()
+    .references(() => sourceVersions.id),
   question: text('question').notNull(),
   rationale: text('rationale').notNull(),
   lesson: text('lesson').notNull(),
   driftScore: real('drift_score'),
   status: learningUnitStatusEnum('status').notNull().default('active'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+});
 
 export const pipelineRuns = pgTable('pipeline_runs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  sourceId: uuid('source_id').notNull().references(() => sources.id),
+  sourceId: uuid('source_id')
+    .notNull()
+    .references(() => sources.id),
   sourceVersionId: uuid('source_version_id').references(() => sourceVersions.id),
   triggeredAt: timestamp('triggered_at').defaultNow().notNull(),
   completedAt: timestamp('completed_at'),
   status: pipelineStatusEnum('status').notNull().default('running'),
-})
+});
 
 export const pipelineStages = pgTable('pipeline_stages', {
   id: uuid('id').primaryKey().defaultRandom(),
-  pipelineRunId: uuid('pipeline_run_id').notNull().references(() => pipelineRuns.id),
+  pipelineRunId: uuid('pipeline_run_id')
+    .notNull()
+    .references(() => pipelineRuns.id),
   stage: stageNameEnum('stage').notNull(),
   status: stageStatusEnum('status').notNull().default('pending'),
   startedAt: timestamp('started_at'),
   completedAt: timestamp('completed_at'),
   outputSummary: text('output_summary'),
   error: text('error'),
-})
+});
 
 export const driftItems = pgTable('drift_items', {
   id: uuid('id').primaryKey().defaultRandom(),
-  pipelineRunId: uuid('pipeline_run_id').notNull().references(() => pipelineRuns.id),
-  topicId: uuid('topic_id').notNull().references(() => topics.id),
+  pipelineRunId: uuid('pipeline_run_id')
+    .notNull()
+    .references(() => pipelineRuns.id),
+  topicId: uuid('topic_id')
+    .notNull()
+    .references(() => topics.id),
   changeType: text('change_type').notNull(),
   driftScore: real('drift_score').notNull(),
   driftLevel: driftLevelEnum('drift_level').notNull(),
   reason: text('reason').notNull(),
   status: driftItemStatusEnum('status').notNull().default('auto_applied'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-})
+});
 ```
 
 - [ ] **Step 2: Write DB client**
 
 ```typescript
 // src/db/index.ts
-import { drizzle } from 'drizzle-orm/postgres-js'
-import postgres from 'postgres'
-import * as schema from './schema'
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from './schema';
 
-const client = postgres(process.env.DATABASE_URL!)
-export const db = drizzle(client, { schema })
+const client = postgres(process.env.DATABASE_URL!);
+export const db = drizzle(client, { schema });
 ```
 
 - [ ] **Step 3: Generate and run migration**
@@ -352,11 +399,13 @@ git commit -m "feat: add drizzle schema and run initial migration"
 ## Task 3: Core Utilities — Normalize + Constants
 
 **Files:**
+
 - Create: `src/lib/constants.ts`
 - Create: `src/lib/normalize.ts`
 - Create: `tests/lib/normalize.test.ts`
 
 **Interfaces:**
+
 - Produces: `normalizeContent(raw: string): string`
 - Produces: `hashContent(normalized: string): string`
 - Produces: `DRIFT_HIGH_THRESHOLD`, `CONTENT_MAX_CHARS` from constants
@@ -365,46 +414,46 @@ git commit -m "feat: add drizzle schema and run initial migration"
 
 ```typescript
 // tests/lib/normalize.test.ts
-import { describe, it, expect } from 'vitest'
-import { normalizeContent, hashContent } from '../../src/lib/normalize'
+import { describe, it, expect } from 'vitest';
+import { normalizeContent, hashContent } from '../../src/lib/normalize';
 
 describe('normalizeContent', () => {
   it('strips HTML tags', () => {
-    expect(normalizeContent('<p>Hello <b>world</b></p>')).toBe('hello world')
-  })
+    expect(normalizeContent('<p>Hello <b>world</b></p>')).toBe('hello world');
+  });
 
   it('collapses whitespace', () => {
-    expect(normalizeContent('hello   \n\t  world')).toBe('hello world')
-  })
+    expect(normalizeContent('hello   \n\t  world')).toBe('hello world');
+  });
 
   it('lowercases', () => {
-    expect(normalizeContent('Cloud Run AUTOSCALING')).toBe('cloud run autoscaling')
-  })
+    expect(normalizeContent('Cloud Run AUTOSCALING')).toBe('cloud run autoscaling');
+  });
 
   it('trims', () => {
-    expect(normalizeContent('  hello  ')).toBe('hello')
-  })
-})
+    expect(normalizeContent('  hello  ')).toBe('hello');
+  });
+});
 
 describe('hashContent', () => {
   it('returns same hash for same content', () => {
-    const a = hashContent('cloud run autoscaling supports 1000 instances')
-    const b = hashContent('cloud run autoscaling supports 1000 instances')
-    expect(a).toBe(b)
-  })
+    const a = hashContent('cloud run autoscaling supports 1000 instances');
+    const b = hashContent('cloud run autoscaling supports 1000 instances');
+    expect(a).toBe(b);
+  });
 
   it('returns different hash for different content', () => {
-    const a = hashContent('supports 1000 instances')
-    const b = hashContent('supports 100 instances')
-    expect(a).not.toBe(b)
-  })
+    const a = hashContent('supports 1000 instances');
+    const b = hashContent('supports 100 instances');
+    expect(a).not.toBe(b);
+  });
 
   it('is insensitive to extra whitespace before hashing', () => {
-    const a = hashContent('hello  world')
-    const b = hashContent('hello world')
-    expect(a).toBe(b)
-  })
-})
+    const a = hashContent('hello  world');
+    const b = hashContent('hello world');
+    expect(a).toBe(b);
+  });
+});
 ```
 
 - [ ] **Step 2: Run tests to confirm they fail**
@@ -419,28 +468,28 @@ Expected: FAIL — `normalizeContent` not found
 
 ```typescript
 // src/lib/constants.ts
-export const DRIFT_HIGH_THRESHOLD = 0.75
-export const CONTENT_MAX_CHARS = 500_000
+export const DRIFT_HIGH_THRESHOLD = 0.75;
+export const CONTENT_MAX_CHARS = 500_000;
 ```
 
 - [ ] **Step 4: Write normalize utilities**
 
 ```typescript
 // src/lib/normalize.ts
-import { createHash } from 'crypto'
+import { createHash } from 'crypto';
 
 export function normalizeContent(raw: string): string {
   return raw
-    .replace(/<[^>]+>/g, ' ')   // strip HTML tags
+    .replace(/<[^>]+>/g, ' ') // strip HTML tags
     .toLowerCase()
-    .replace(/\s+/g, ' ')        // collapse whitespace
-    .trim()
+    .replace(/\s+/g, ' ') // collapse whitespace
+    .trim();
 }
 
 export function hashContent(normalized: string): string {
   // aggressive local collapse before hashing — never stored
-  const forHashing = normalized.replace(/\s+/g, ' ').trim()
-  return createHash('md5').update(forHashing).digest('hex')
+  const forHashing = normalized.replace(/\s+/g, ' ').trim();
+  return createHash('md5').update(forHashing).digest('hex');
 }
 ```
 
@@ -464,12 +513,14 @@ git commit -m "feat: add normalizeContent and hashContent utilities"
 ## Task 4: Source Extractors
 
 **Files:**
+
 - Create: `src/lib/extractors/url.ts`
 - Create: `src/lib/extractors/pdf.ts`
 - Create: `src/lib/extractors/md.ts`
 - Create: `tests/lib/extractors/md.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing
 - Produces:
   - `fetchAndExtract(url: string): Promise<string>`
@@ -478,30 +529,30 @@ git commit -m "feat: add normalizeContent and hashContent utilities"
 
 - [ ] **Step 1: Write failing test for MD extractor**
 
-```typescript
+````typescript
 // tests/lib/extractors/md.test.ts
-import { describe, it, expect } from 'vitest'
-import { extractFromMd } from '../../../src/lib/extractors/md'
+import { describe, it, expect } from 'vitest';
+import { extractFromMd } from '../../../src/lib/extractors/md';
 
 describe('extractFromMd', () => {
   it('strips markdown headings', () => {
-    expect(extractFromMd('## Cloud Run\n\nSome content')).toContain('Cloud Run')
-    expect(extractFromMd('## Cloud Run\n\nSome content')).not.toContain('##')
-  })
+    expect(extractFromMd('## Cloud Run\n\nSome content')).toContain('Cloud Run');
+    expect(extractFromMd('## Cloud Run\n\nSome content')).not.toContain('##');
+  });
 
   it('strips bold and italic', () => {
-    expect(extractFromMd('**bold** and _italic_')).toBe('bold and italic')
-  })
+    expect(extractFromMd('**bold** and _italic_')).toBe('bold and italic');
+  });
 
   it('strips links but keeps text', () => {
-    expect(extractFromMd('[Google](https://google.com)')).toBe('Google')
-  })
+    expect(extractFromMd('[Google](https://google.com)')).toBe('Google');
+  });
 
   it('strips code fences', () => {
-    expect(extractFromMd('```\ncode here\n```')).not.toContain('```')
-  })
-})
-```
+    expect(extractFromMd('```\ncode here\n```')).not.toContain('```');
+  });
+});
+````
 
 - [ ] **Step 2: Run to confirm fail**
 
@@ -513,25 +564,25 @@ Expected: FAIL
 
 - [ ] **Step 3: Write MD extractor**
 
-```typescript
+````typescript
 // src/lib/extractors/md.ts
 export function extractFromMd(content: string): string {
   return content
-    .replace(/```[\s\S]*?```/g, '')        // strip code fences
-    .replace(/`[^`]+`/g, '')               // strip inline code
-    .replace(/#{1,6}\s+/g, '')             // strip headings
-    .replace(/\*\*([^*]+)\*\*/g, '$1')    // strip bold
-    .replace(/__([^_]+)__/g, '$1')        // strip bold alt
-    .replace(/\*([^*]+)\*/g, '$1')        // strip italic
-    .replace(/_([^_]+)_/g, '$1')          // strip italic alt
+    .replace(/```[\s\S]*?```/g, '') // strip code fences
+    .replace(/`[^`]+`/g, '') // strip inline code
+    .replace(/#{1,6}\s+/g, '') // strip headings
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // strip bold
+    .replace(/__([^_]+)__/g, '$1') // strip bold alt
+    .replace(/\*([^*]+)\*/g, '$1') // strip italic
+    .replace(/_([^_]+)_/g, '$1') // strip italic alt
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // strip links, keep text
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '') // strip images
-    .replace(/^[-*+]\s+/gm, '')           // strip list markers
-    .replace(/^\d+\.\s+/gm, '')           // strip ordered list markers
-    .replace(/\n{3,}/g, '\n\n')           // collapse blank lines
-    .trim()
+    .replace(/^[-*+]\s+/gm, '') // strip list markers
+    .replace(/^\d+\.\s+/gm, '') // strip ordered list markers
+    .replace(/\n{3,}/g, '\n\n') // collapse blank lines
+    .trim();
 }
-```
+````
 
 - [ ] **Step 4: Write URL extractor**
 
@@ -540,19 +591,19 @@ export function extractFromMd(content: string): string {
 export async function fetchAndExtract(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SelfHealingBot/1.0)' },
-  })
-  if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${url}`)
-  const html = await res.text()
+  });
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${url}`);
+  const html = await res.text();
   return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')  // remove scripts
-    .replace(/<style[\s\S]*?<\/style>/gi, '')     // remove styles
-    .replace(/<[^>]+>/g, ' ')                     // strip tags
+    .replace(/<script[\s\S]*?<\/script>/gi, '') // remove scripts
+    .replace(/<style[\s\S]*?<\/style>/gi, '') // remove styles
+    .replace(/<[^>]+>/g, ' ') // strip tags
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/\s+/g, ' ')
-    .trim()
+    .trim();
 }
 ```
 
@@ -560,11 +611,11 @@ export async function fetchAndExtract(url: string): Promise<string> {
 
 ```typescript
 // src/lib/extractors/pdf.ts
-import pdfParse from 'pdf-parse'
+import pdfParse from 'pdf-parse';
 
 export async function extractFromPdf(buffer: Buffer): Promise<string> {
-  const data = await pdfParse(buffer)
-  return data.text
+  const data = await pdfParse(buffer);
+  return data.text;
 }
 ```
 
@@ -588,12 +639,14 @@ git commit -m "feat: add url, pdf, and markdown source extractors"
 ## Task 5: Pipeline Stage Runner + Prompts
 
 **Files:**
+
 - Create: `src/pipeline/stage-runner.ts`
 - Create: `src/pipeline/prompts.ts`
 
 **Interfaces:**
+
 - Produces: `runStage(runId, stageName, fn): Promise<T>` — wraps any stage function with DB logging
-- Produces: `buildExtractPrompt(topicName, description, sourceContent)` 
+- Produces: `buildExtractPrompt(topicName, description, sourceContent)`
 - Produces: `buildDriftPrompt(topicName, oldContent, newContent)`
 - Produces: `buildGeneratePrompt(topicName, description, extractedContent)`
 - Produces: `buildProposeTopicsPrompt(existingTopics, newContent)`
@@ -602,11 +655,11 @@ git commit -m "feat: add url, pdf, and markdown source extractors"
 
 ```typescript
 // src/pipeline/stage-runner.ts
-import { db } from '@/db'
-import { pipelineStages, pipelineRuns } from '@/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { db } from '@/db';
+import { pipelineStages, pipelineRuns } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 
-type StageName = typeof pipelineStages.$inferInsert['stage']
+type StageName = (typeof pipelineStages.$inferInsert)['stage'];
 
 export async function runStage<T>(
   pipelineRunId: string,
@@ -618,36 +671,30 @@ export async function runStage<T>(
     stage: stageName,
     status: 'running',
     startedAt: new Date(),
-  })
+  });
 
   try {
-    const result = await fn()
+    const result = await fn();
     await db
       .update(pipelineStages)
       .set({ status: 'completed', completedAt: new Date() })
       .where(
-        and(
-          eq(pipelineStages.pipelineRunId, pipelineRunId),
-          eq(pipelineStages.stage, stageName)
-        )
-      )
-    return result
+        and(eq(pipelineStages.pipelineRunId, pipelineRunId), eq(pipelineStages.stage, stageName))
+      );
+    return result;
   } catch (err) {
-    const error = err instanceof Error ? err.message : String(err)
+    const error = err instanceof Error ? err.message : String(err);
     await db
       .update(pipelineStages)
       .set({ status: 'failed', completedAt: new Date(), error })
       .where(
-        and(
-          eq(pipelineStages.pipelineRunId, pipelineRunId),
-          eq(pipelineStages.stage, stageName)
-        )
-      )
+        and(eq(pipelineStages.pipelineRunId, pipelineRunId), eq(pipelineStages.stage, stageName))
+      );
     await db
       .update(pipelineRuns)
       .set({ status: 'failed', completedAt: new Date() })
-      .where(eq(pipelineRuns.id, pipelineRunId))
-    throw err
+      .where(eq(pipelineRuns.id, pipelineRunId));
+    throw err;
   }
 }
 
@@ -658,7 +705,7 @@ export async function skipStage(pipelineRunId: string, stageName: StageName) {
     status: 'skipped',
     startedAt: new Date(),
     completedAt: new Date(),
-  })
+  });
 }
 ```
 
@@ -686,7 +733,7 @@ Copy the text VERBATIM — do not paraphrase, summarize, reorder, or add any wor
 If a passage is relevant, copy it exactly as it appears.
 If nothing in the source is relevant to this topic, return an empty string.
 
-Return only the extracted passages, nothing else.`
+Return only the extracted passages, nothing else.`;
 }
 
 export function buildDriftPrompt(
@@ -712,7 +759,7 @@ Analyze the semantic difference. Return a JSON object with:
 - changeType: one of "NO_CHANGE" | "MINOR_EDIT" | "SEMANTIC_CHANGE" | "MAJOR_RESTRUCTURE" | "CONTENT_REMOVED"
 - driftScore: float 0.0 to 1.0 (0 = identical meaning, 1 = completely different)
 - requiresRepair: boolean (true if learning content grounded in this topic needs updating)
-- reason: one sentence explaining the most significant change`
+- reason: one sentence explaining the most significant change`;
 }
 
 export function buildGeneratePrompt(
@@ -735,17 +782,14 @@ Generate a learning unit as JSON with exactly these fields:
 - rationale: a detailed explanation of why the correct answer is correct, grounded in the source content
 - lesson: a concise summary of the key concept a learner should understand from this topic
 
-The question, rationale, and lesson must be grounded only in the provided source content.`
+The question, rationale, and lesson must be grounded only in the provided source content.`;
 }
 
-export function buildProposeTopicsPrompt(
-  existingTopicNames: string[],
-  newContent: string
-): string {
+export function buildProposeTopicsPrompt(existingTopicNames: string[], newContent: string): string {
   return `You are identifying new topics in source content that are not yet covered.
 
 Existing topics already defined:
-${existingTopicNames.map(n => `- ${n}`).join('\n')}
+${existingTopicNames.map((n) => `- ${n}`).join('\n')}
 
 New/changed content:
 ---
@@ -758,7 +802,7 @@ Return a JSON array. Each item must have:
 - description: one sentence describing what this topic covers
 - extractedContent: verbatim passages from the content that are relevant to this topic
 
-If no new topics are found, return an empty array.`
+If no new topics are found, return an empty array.`;
 }
 ```
 
@@ -774,12 +818,14 @@ git commit -m "feat: add pipeline stage runner and LLM prompts"
 ## Task 6: Pipeline Stages 1–3 (Ingest, Normalize, Hash Check)
 
 **Files:**
+
 - Create: `src/pipeline/stages/ingest.ts`
 - Create: `src/pipeline/stages/normalize.ts`
 - Create: `src/pipeline/stages/hash-check.ts`
 - Create: `tests/pipeline/hash-check.test.ts`
 
 **Interfaces:**
+
 - Consumes: `db`, `sources`, `sourceVersions` schema, `CONTENT_MAX_CHARS`
 - Produces:
   - `ingestStage(runId, sourceId): Promise<{ rawContent: string }>`
@@ -790,22 +836,22 @@ git commit -m "feat: add pipeline stage runner and LLM prompts"
 
 ```typescript
 // tests/pipeline/hash-check.test.ts
-import { describe, it, expect } from 'vitest'
-import { computeHashCheckResult } from '../../src/pipeline/stages/hash-check'
+import { describe, it, expect } from 'vitest';
+import { computeHashCheckResult } from '../../src/pipeline/stages/hash-check';
 
 describe('computeHashCheckResult', () => {
   it('returns stopped=true when hashes match', () => {
-    expect(computeHashCheckResult('abc123', 'abc123')).toEqual({ stopped: true })
-  })
+    expect(computeHashCheckResult('abc123', 'abc123')).toEqual({ stopped: true });
+  });
 
   it('returns stopped=false when hashes differ', () => {
-    expect(computeHashCheckResult('abc123', 'def456')).toEqual({ stopped: false })
-  })
+    expect(computeHashCheckResult('abc123', 'def456')).toEqual({ stopped: false });
+  });
 
   it('returns stopped=false when previousHash is null (first run)', () => {
-    expect(computeHashCheckResult('abc123', null)).toEqual({ stopped: false })
-  })
-})
+    expect(computeHashCheckResult('abc123', null)).toEqual({ stopped: false });
+  });
+});
 ```
 
 - [ ] **Step 2: Run to confirm fail**
@@ -820,41 +866,41 @@ Expected: FAIL
 
 ```typescript
 // src/pipeline/stages/ingest.ts
-import { db } from '@/db'
-import { sources } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { fetchAndExtract } from '@/lib/extractors/url'
-import { extractFromPdf } from '@/lib/extractors/pdf'
-import { extractFromMd } from '@/lib/extractors/md'
-import { CONTENT_MAX_CHARS } from '@/lib/constants'
+import { db } from '@/db';
+import { sources } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { fetchAndExtract } from '@/lib/extractors/url';
+import { extractFromPdf } from '@/lib/extractors/pdf';
+import { extractFromMd } from '@/lib/extractors/md';
+import { CONTENT_MAX_CHARS } from '@/lib/constants';
 
 export async function ingestStage(
   _runId: string,
   sourceId: string,
   file?: { buffer: Buffer; type: 'pdf' | 'md'; content?: string }
 ): Promise<{ rawContent: string }> {
-  const [source] = await db.select().from(sources).where(eq(sources.id, sourceId))
-  if (!source) throw new Error(`Source not found: ${sourceId}`)
+  const [source] = await db.select().from(sources).where(eq(sources.id, sourceId));
+  if (!source) throw new Error(`Source not found: ${sourceId}`);
 
-  let rawContent: string
+  let rawContent: string;
 
   if (source.type === 'url') {
-    rawContent = await fetchAndExtract(source.url!)
+    rawContent = await fetchAndExtract(source.url!);
   } else if (source.type === 'pdf') {
-    if (!file?.buffer) throw new Error('PDF buffer required')
-    rawContent = await extractFromPdf(file.buffer)
+    if (!file?.buffer) throw new Error('PDF buffer required');
+    rawContent = await extractFromPdf(file.buffer);
   } else {
-    if (!file?.content) throw new Error('Markdown content required')
-    rawContent = extractFromMd(file.content)
+    if (!file?.content) throw new Error('Markdown content required');
+    rawContent = extractFromMd(file.content);
   }
 
   if (rawContent.length > CONTENT_MAX_CHARS) {
     throw new Error(
       `Content exceeds max length (${rawContent.length} > ${CONTENT_MAX_CHARS} chars). Split the source.`
-    )
+    );
   }
 
-  return { rawContent }
+  return { rawContent };
 }
 ```
 
@@ -862,15 +908,15 @@ export async function ingestStage(
 
 ```typescript
 // src/pipeline/stages/normalize.ts
-import { normalizeContent, hashContent } from '@/lib/normalize'
+import { normalizeContent, hashContent } from '@/lib/normalize';
 
 export async function normalizeStage(
   _runId: string,
   rawContent: string
 ): Promise<{ normalized: string; hash: string }> {
-  const normalized = normalizeContent(rawContent)
-  const hash = hashContent(normalized)
-  return { normalized, hash }
+  const normalized = normalizeContent(rawContent);
+  const hash = hashContent(normalized);
+  return { normalized, hash };
 }
 ```
 
@@ -878,15 +924,15 @@ export async function normalizeStage(
 
 ```typescript
 // src/pipeline/stages/hash-check.ts
-import { db } from '@/db'
-import { sourceVersions, pipelineRuns } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { db } from '@/db';
+import { sourceVersions, pipelineRuns } from '@/db/schema';
+import { eq, desc } from 'drizzle-orm';
 
 export function computeHashCheckResult(
   newHash: string,
   previousHash: string | null
 ): { stopped: boolean } {
-  return { stopped: previousHash !== null && newHash === previousHash }
+  return { stopped: previousHash !== null && newHash === previousHash };
 }
 
 export async function hashCheckStage(
@@ -900,29 +946,29 @@ export async function hashCheckStage(
     .from(sourceVersions)
     .where(eq(sourceVersions.sourceId, sourceId))
     .orderBy(desc(sourceVersions.createdAt))
-    .limit(1)
+    .limit(1);
 
-  const { stopped } = computeHashCheckResult(hash, latest?.contentHash ?? null)
+  const { stopped } = computeHashCheckResult(hash, latest?.contentHash ?? null);
 
   if (stopped) {
     await db
       .update(pipelineRuns)
       .set({ status: 'completed', completedAt: new Date() })
-      .where(eq(pipelineRuns.id, runId))
-    return { stopped: true, sourceVersionId: latest!.id }
+      .where(eq(pipelineRuns.id, runId));
+    return { stopped: true, sourceVersionId: latest!.id };
   }
 
   const [newVersion] = await db
     .insert(sourceVersions)
     .values({ sourceId, contentHash: hash, normalizedContent: normalized })
-    .returning()
+    .returning();
 
   await db
     .update(pipelineRuns)
     .set({ sourceVersionId: newVersion.id })
-    .where(eq(pipelineRuns.id, runId))
+    .where(eq(pipelineRuns.id, runId));
 
-  return { stopped: false, sourceVersionId: newVersion.id }
+  return { stopped: false, sourceVersionId: newVersion.id };
 }
 ```
 
@@ -947,9 +993,11 @@ git commit -m "feat: add pipeline stages 1-3 (ingest, normalize, hash-check)"
 ## Task 7: Pipeline Stage 4 — Extract Topics
 
 **Files:**
+
 - Create: `src/pipeline/stages/extract-topics.ts`
 
 **Interfaces:**
+
 - Consumes: `buildExtractPrompt`, `buildProposeTopicsPrompt` from `prompts.ts`; `db`; `hashContent`; `normalizeContent`
 - Produces: `extractTopicsStage(runId, sourceId, sourceVersionId, normalizedContent): Promise<{ affectedTopicIds: string[], firstRunTopicIds: string[] }>`
   - `affectedTopicIds`: topics with a previous extraction that changed → need drift analysis
@@ -959,23 +1007,25 @@ git commit -m "feat: add pipeline stages 1-3 (ingest, normalize, hash-check)"
 
 ```typescript
 // src/pipeline/stages/extract-topics.ts
-import { db } from '@/db'
-import { topics, topicExtractions, proposedTopics } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
-import { generateText, generateObject } from 'ai'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import { z } from 'zod'
-import { normalizeContent, hashContent } from '@/lib/normalize'
-import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts'
+import { db } from '@/db';
+import { topics, topicExtractions, proposedTopics } from '@/db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { generateText, generateObject } from 'ai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { z } from 'zod';
+import { normalizeContent, hashContent } from '@/lib/normalize';
+import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts';
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
-const model = openrouter('google/gemini-2.0-flash-exp:free')
+const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
+const model = openrouter('google/gemini-2.0-flash-exp:free');
 
-const ProposedTopicsSchema = z.array(z.object({
-  name: z.string(),
-  description: z.string(),
-  extractedContent: z.string(),
-}))
+const ProposedTopicsSchema = z.array(
+  z.object({
+    name: z.string(),
+    description: z.string(),
+    extractedContent: z.string(),
+  })
+);
 
 export async function extractTopicsStage(
   runId: string,
@@ -983,61 +1033,58 @@ export async function extractTopicsStage(
   sourceVersionId: string,
   normalizedContent: string
 ): Promise<{ affectedTopicIds: string[] }> {
-  const sourceTopics = await db
-    .select()
-    .from(topics)
-    .where(eq(topics.sourceId, sourceId))
+  const sourceTopics = await db.select().from(topics).where(eq(topics.sourceId, sourceId));
 
-  const affectedTopicIds: string[] = []
-  const firstRunTopicIds: string[] = []
+  const affectedTopicIds: string[] = [];
+  const firstRunTopicIds: string[] = [];
 
   for (const topic of sourceTopics) {
     const { text: extracted } = await generateText({
       model,
       prompt: buildExtractPrompt(topic.name, topic.description, normalizedContent),
       temperature: 0,
-    })
+    });
 
-    const normalizedExtraction = normalizeContent(extracted)
-    const extractionHash = hashContent(normalizedExtraction)
+    const normalizedExtraction = normalizeContent(extracted);
+    const extractionHash = hashContent(normalizedExtraction);
 
     const [previousExtraction] = await db
       .select()
       .from(topicExtractions)
       .where(eq(topicExtractions.topicId, topic.id))
       .orderBy(desc(topicExtractions.createdAt))
-      .limit(1)
+      .limit(1);
 
     await db.insert(topicExtractions).values({
       topicId: topic.id,
       sourceVersionId,
       extractedContent: normalizedExtraction,
       contentHash: extractionHash,
-    })
+    });
 
-    const isFirstRun = !previousExtraction
-    const hasChanged = previousExtraction && extractionHash !== previousExtraction.contentHash
+    const isFirstRun = !previousExtraction;
+    const hasChanged = previousExtraction && extractionHash !== previousExtraction.contentHash;
 
     if (isFirstRun) {
-      firstRunTopicIds.push(topic.id)
+      firstRunTopicIds.push(topic.id);
     } else if (hasChanged) {
-      affectedTopicIds.push(topic.id)
+      affectedTopicIds.push(topic.id);
     }
   }
 
   // Propose new topics from content not covered by existing topics
   if (sourceTopics.length > 0) {
-    const existingNames = sourceTopics.map(t => t.name)
+    const existingNames = sourceTopics.map((t) => t.name);
     const { object: proposed } = await generateObject({
       model,
       schema: ProposedTopicsSchema,
       prompt: buildProposeTopicsPrompt(existingNames, normalizedContent),
       temperature: 0,
-    })
+    });
 
     if (proposed.length > 0) {
       await db.insert(proposedTopics).values(
-        proposed.map(p => ({
+        proposed.map((p) => ({
           sourceVersionId,
           pipelineRunId: runId,
           name: p.name,
@@ -1045,11 +1092,11 @@ export async function extractTopicsStage(
           extractedContent: p.extractedContent,
           status: 'pending_approval' as const,
         }))
-      )
+      );
     }
   }
 
-  return { affectedTopicIds, firstRunTopicIds }
+  return { affectedTopicIds, firstRunTopicIds };
 }
 ```
 
@@ -1065,11 +1112,13 @@ git commit -m "feat: add pipeline stage 4 (extract topics)"
 ## Task 8: Pipeline Stages 5–6 — Drift Analysis + Repair Decision
 
 **Files:**
+
 - Create: `src/pipeline/stages/drift-analysis.ts`
 - Create: `src/pipeline/stages/repair-decision.ts`
 - Create: `tests/pipeline/repair-decision.test.ts`
 
 **Interfaces:**
+
 - Consumes: `buildDriftPrompt`, `DRIFT_HIGH_THRESHOLD`, `db`
 - Produces:
   - `driftAnalysisStage(runId, affectedTopicIds, sourceVersionId): Promise<void>`
@@ -1079,40 +1128,43 @@ git commit -m "feat: add pipeline stage 4 (extract topics)"
 
 ```typescript
 // tests/pipeline/repair-decision.test.ts
-import { describe, it, expect } from 'vitest'
-import { computeDriftLevel, computeRepairDecision } from '../../src/pipeline/stages/repair-decision'
+import { describe, it, expect } from 'vitest';
+import {
+  computeDriftLevel,
+  computeRepairDecision,
+} from '../../src/pipeline/stages/repair-decision';
 
 describe('computeDriftLevel', () => {
   it('returns low for score < 0.5', () => {
-    expect(computeDriftLevel(0.3)).toBe('low')
-    expect(computeDriftLevel(0.0)).toBe('low')
-  })
+    expect(computeDriftLevel(0.3)).toBe('low');
+    expect(computeDriftLevel(0.0)).toBe('low');
+  });
 
   it('returns med for score 0.5 - 0.74', () => {
-    expect(computeDriftLevel(0.5)).toBe('med')
-    expect(computeDriftLevel(0.74)).toBe('med')
-  })
+    expect(computeDriftLevel(0.5)).toBe('med');
+    expect(computeDriftLevel(0.74)).toBe('med');
+  });
 
   it('returns high for score >= 0.75', () => {
-    expect(computeDriftLevel(0.75)).toBe('high')
-    expect(computeDriftLevel(1.0)).toBe('high')
-  })
-})
+    expect(computeDriftLevel(0.75)).toBe('high');
+    expect(computeDriftLevel(1.0)).toBe('high');
+  });
+});
 
 describe('computeRepairDecision', () => {
   it('auto-applies low drift', () => {
-    expect(computeRepairDecision(0.3)).toBe('auto_applied')
-  })
+    expect(computeRepairDecision(0.3)).toBe('auto_applied');
+  });
 
   it('auto-applies medium drift', () => {
-    expect(computeRepairDecision(0.6)).toBe('auto_applied')
-  })
+    expect(computeRepairDecision(0.6)).toBe('auto_applied');
+  });
 
   it('gates high drift for review', () => {
-    expect(computeRepairDecision(0.75)).toBe('pending_review')
-    expect(computeRepairDecision(1.0)).toBe('pending_review')
-  })
-})
+    expect(computeRepairDecision(0.75)).toBe('pending_review');
+    expect(computeRepairDecision(1.0)).toBe('pending_review');
+  });
+});
 ```
 
 - [ ] **Step 2: Run to confirm fail**
@@ -1127,26 +1179,30 @@ Expected: FAIL
 
 ```typescript
 // src/pipeline/stages/drift-analysis.ts
-import { db } from '@/db'
-import { topics, topicExtractions, driftItems } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
-import { generateObject } from 'ai'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import { z } from 'zod'
-import { buildDriftPrompt } from '@/pipeline/prompts'
-import { computeDriftLevel, computeRepairDecision } from './repair-decision'
+import { db } from '@/db';
+import { topics, topicExtractions, driftItems } from '@/db/schema';
+import { eq, desc } from 'drizzle-orm';
+import { generateObject } from 'ai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { z } from 'zod';
+import { buildDriftPrompt } from '@/pipeline/prompts';
+import { computeDriftLevel, computeRepairDecision } from './repair-decision';
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
-const model = openrouter('google/gemini-2.0-flash-exp:free')
+const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
+const model = openrouter('google/gemini-2.0-flash-exp:free');
 
 const DriftAnalysisSchema = z.object({
   changeType: z.enum([
-    'NO_CHANGE', 'MINOR_EDIT', 'SEMANTIC_CHANGE', 'MAJOR_RESTRUCTURE', 'CONTENT_REMOVED'
+    'NO_CHANGE',
+    'MINOR_EDIT',
+    'SEMANTIC_CHANGE',
+    'MAJOR_RESTRUCTURE',
+    'CONTENT_REMOVED',
   ]),
   driftScore: z.number().min(0).max(1),
   requiresRepair: z.boolean(),
   reason: z.string(),
-})
+});
 
 export async function driftAnalysisStage(
   runId: string,
@@ -1154,27 +1210,27 @@ export async function driftAnalysisStage(
   sourceVersionId: string
 ): Promise<void> {
   for (const topicId of affectedTopicIds) {
-    const [topic] = await db.select().from(topics).where(eq(topics.id, topicId))
-    
+    const [topic] = await db.select().from(topics).where(eq(topics.id, topicId));
+
     const extractions = await db
       .select()
       .from(topicExtractions)
       .where(eq(topicExtractions.topicId, topicId))
       .orderBy(desc(topicExtractions.createdAt))
-      .limit(2)
+      .limit(2);
 
     // extractions[0] = new, extractions[1] = previous
-    const newContent = extractions[0].extractedContent
-    const oldContent = extractions[1].extractedContent
+    const newContent = extractions[0].extractedContent;
+    const oldContent = extractions[1].extractedContent;
 
     const { object } = await generateObject({
       model,
       schema: DriftAnalysisSchema,
       prompt: buildDriftPrompt(topic.name, oldContent, newContent),
-    })
+    });
 
-    const driftLevel = computeDriftLevel(object.driftScore)
-    const status = computeRepairDecision(object.driftScore)
+    const driftLevel = computeDriftLevel(object.driftScore);
+    const status = computeRepairDecision(object.driftScore);
 
     await db.insert(driftItems).values({
       pipelineRunId: runId,
@@ -1184,7 +1240,7 @@ export async function driftAnalysisStage(
       driftLevel,
       reason: object.reason,
       status,
-    })
+    });
   }
 }
 ```
@@ -1193,48 +1249,44 @@ export async function driftAnalysisStage(
 
 ```typescript
 // src/pipeline/stages/repair-decision.ts
-import { db } from '@/db'
-import { driftItems, pipelineRuns, proposedTopics } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { DRIFT_HIGH_THRESHOLD } from '@/lib/constants'
+import { db } from '@/db';
+import { driftItems, pipelineRuns, proposedTopics } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { DRIFT_HIGH_THRESHOLD } from '@/lib/constants';
 
 export function computeDriftLevel(score: number): 'low' | 'med' | 'high' {
-  if (score >= DRIFT_HIGH_THRESHOLD) return 'high'
-  if (score >= 0.5) return 'med'
-  return 'low'
+  if (score >= DRIFT_HIGH_THRESHOLD) return 'high';
+  if (score >= 0.5) return 'med';
+  return 'low';
 }
 
-export function computeRepairDecision(
-  score: number
-): 'auto_applied' | 'pending_review' {
-  return score >= DRIFT_HIGH_THRESHOLD ? 'pending_review' : 'auto_applied'
+export function computeRepairDecision(score: number): 'auto_applied' | 'pending_review' {
+  return score >= DRIFT_HIGH_THRESHOLD ? 'pending_review' : 'auto_applied';
 }
 
-export async function repairDecisionStage(
-  runId: string
-): Promise<{ paused: boolean }> {
+export async function repairDecisionStage(runId: string): Promise<{ paused: boolean }> {
   const runDriftItems = await db
     .select()
     .from(driftItems)
-    .where(eq(driftItems.pipelineRunId, runId))
+    .where(eq(driftItems.pipelineRunId, runId));
 
   const runProposedTopics = await db
     .select()
     .from(proposedTopics)
-    .where(eq(proposedTopics.pipelineRunId, runId))
+    .where(eq(proposedTopics.pipelineRunId, runId));
 
-  const hasPendingReview = runDriftItems.some(d => d.status === 'pending_review')
-  const hasPendingTopics = runProposedTopics.length > 0
+  const hasPendingReview = runDriftItems.some((d) => d.status === 'pending_review');
+  const hasPendingTopics = runProposedTopics.length > 0;
 
   if (hasPendingReview || hasPendingTopics) {
     await db
       .update(pipelineRuns)
       .set({ status: 'awaiting_review' })
-      .where(eq(pipelineRuns.id, runId))
-    return { paused: true }
+      .where(eq(pipelineRuns.id, runId));
+    return { paused: true };
   }
 
-  return { paused: false }
+  return { paused: false };
 }
 ```
 
@@ -1259,10 +1311,12 @@ git commit -m "feat: add pipeline stages 5-6 (drift analysis, repair decision)"
 ## Task 9: Pipeline Stage 7 + Workflow Assembly
 
 **Files:**
+
 - Create: `src/pipeline/stages/generate.ts`
 - Create: `src/pipeline/run.ts`
 
 **Interfaces:**
+
 - Consumes: all stages, `runStage`, `skipStage`
 - Produces: `runPipeline(runId, sourceId, file?): Promise<void>` — the main entry point
 
@@ -1270,25 +1324,28 @@ git commit -m "feat: add pipeline stages 5-6 (drift analysis, repair decision)"
 
 ```typescript
 // src/pipeline/stages/generate.ts
-import { db } from '@/db'
+import { db } from '@/db';
 import {
-  driftItems, topicExtractions, topics, learningUnits,
-  learningUnitVersions
-} from '@/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
-import { generateObject } from 'ai'
-import { createOpenRouter } from '@openrouter/ai-sdk-provider'
-import { z } from 'zod'
-import { buildGeneratePrompt } from '@/pipeline/prompts'
+  driftItems,
+  topicExtractions,
+  topics,
+  learningUnits,
+  learningUnitVersions,
+} from '@/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+import { generateObject } from 'ai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { z } from 'zod';
+import { buildGeneratePrompt } from '@/pipeline/prompts';
 
-const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
-const model = openrouter('google/gemini-2.0-flash-exp:free')
+const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
+const model = openrouter('google/gemini-2.0-flash-exp:free');
 
 const LearningUnitSchema = z.object({
   question: z.string(),
   rationale: z.string(),
   lesson: z.string(),
-})
+});
 
 export async function generateStage(
   runId: string,
@@ -1299,20 +1356,15 @@ export async function generateStage(
   const autoAppliedItems = await db
     .select()
     .from(driftItems)
-    .where(
-      and(
-        eq(driftItems.pipelineRunId, runId),
-        eq(driftItems.status, 'auto_applied')
-      )
-    )
+    .where(and(eq(driftItems.pipelineRunId, runId), eq(driftItems.status, 'auto_applied')));
 
   for (const item of autoAppliedItems) {
-    await generateForTopic(item.topicId, sourceVersionId, item.driftScore)
+    await generateForTopic(item.topicId, sourceVersionId, item.driftScore);
   }
 
   // Generate for first-run topics (no drift to compare, generate from scratch)
   for (const topicId of firstRunTopicIds) {
-    await generateForTopic(topicId, sourceVersionId, null)
+    await generateForTopic(topicId, sourceVersionId, null);
   }
 }
 
@@ -1321,37 +1373,30 @@ export async function generateForTopic(
   sourceVersionId: string,
   driftScore: number | null = null
 ): Promise<void> {
-  const [topic] = await db.select().from(topics).where(eq(topics.id, topicId))
+  const [topic] = await db.select().from(topics).where(eq(topics.id, topicId));
 
   const [latestExtraction] = await db
     .select()
     .from(topicExtractions)
     .where(eq(topicExtractions.topicId, topicId))
     .orderBy(desc(topicExtractions.createdAt))
-    .limit(1)
+    .limit(1);
 
   const { object } = await generateObject({
     model,
     schema: LearningUnitSchema,
-    prompt: buildGeneratePrompt(
-      topic.name,
-      topic.description,
-      latestExtraction.extractedContent
-    ),
-  })
+    prompt: buildGeneratePrompt(topic.name, topic.description, latestExtraction.extractedContent),
+  });
 
   // Get or create learning unit for this topic
   let [unit] = await db
     .select()
     .from(learningUnits)
     .where(eq(learningUnits.topicId, topicId))
-    .limit(1)
+    .limit(1);
 
   if (!unit) {
-    ;[unit] = await db
-      .insert(learningUnits)
-      .values({ topicId })
-      .returning()
+    [unit] = await db.insert(learningUnits).values({ topicId }).returning();
   }
 
   // Archive previous active version
@@ -1363,7 +1408,7 @@ export async function generateForTopic(
         eq(learningUnitVersions.learningUnitId, unit.id),
         eq(learningUnitVersions.status, 'active')
       )
-    )
+    );
 
   // Insert new active version
   await db.insert(learningUnitVersions).values({
@@ -1374,7 +1419,7 @@ export async function generateForTopic(
     lesson: object.lesson,
     driftScore,
     status: 'active',
-  })
+  });
 }
 ```
 
@@ -1382,77 +1427,73 @@ export async function generateForTopic(
 
 ```typescript
 // src/pipeline/run.ts
-import { db } from '@/db'
-import { pipelineRuns } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { runStage, skipStage } from './stage-runner'
-import { ingestStage } from './stages/ingest'
-import { normalizeStage } from './stages/normalize'
-import { hashCheckStage } from './stages/hash-check'
-import { extractTopicsStage } from './stages/extract-topics'
-import { driftAnalysisStage } from './stages/drift-analysis'
-import { repairDecisionStage } from './stages/repair-decision'
-import { generateStage } from './stages/generate'
+import { db } from '@/db';
+import { pipelineRuns } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { runStage, skipStage } from './stage-runner';
+import { ingestStage } from './stages/ingest';
+import { normalizeStage } from './stages/normalize';
+import { hashCheckStage } from './stages/hash-check';
+import { extractTopicsStage } from './stages/extract-topics';
+import { driftAnalysisStage } from './stages/drift-analysis';
+import { repairDecisionStage } from './stages/repair-decision';
+import { generateStage } from './stages/generate';
 
-type PipelineFile = { buffer: Buffer; type: 'pdf' | 'md'; content?: string }
+type PipelineFile = { buffer: Buffer; type: 'pdf' | 'md'; content?: string };
 
 export async function runPipeline(
   runId: string,
   sourceId: string,
   file?: PipelineFile
 ): Promise<void> {
-  const { rawContent } = await runStage(runId, 'ingest', () =>
-    ingestStage(runId, sourceId, file)
-  )
+  const { rawContent } = await runStage(runId, 'ingest', () => ingestStage(runId, sourceId, file));
 
   const { normalized, hash } = await runStage(runId, 'normalize', () =>
     normalizeStage(runId, rawContent)
-  )
+  );
 
   const { stopped, sourceVersionId } = await runStage(runId, 'hash_check', () =>
     hashCheckStage(runId, sourceId, hash, normalized)
-  )
+  );
 
   if (stopped) {
-    await skipStage(runId, 'extract_topics')
-    await skipStage(runId, 'drift_analysis')
-    await skipStage(runId, 'repair_decision')
-    await skipStage(runId, 'generate')
-    return
+    await skipStage(runId, 'extract_topics');
+    await skipStage(runId, 'drift_analysis');
+    await skipStage(runId, 'repair_decision');
+    await skipStage(runId, 'generate');
+    return;
   }
 
   const { affectedTopicIds, firstRunTopicIds } = await runStage(runId, 'extract_topics', () =>
     extractTopicsStage(runId, sourceId, sourceVersionId, normalized)
-  )
+  );
 
   if (affectedTopicIds.length === 0) {
-    await skipStage(runId, 'drift_analysis')
-    await skipStage(runId, 'repair_decision')
+    await skipStage(runId, 'drift_analysis');
+    await skipStage(runId, 'repair_decision');
     // First-run topics go straight to generate (no drift to analyze)
     await runStage(runId, 'generate', () =>
       generateStage(runId, sourceVersionId, firstRunTopicIds)
-    )
+    );
   } else {
     await runStage(runId, 'drift_analysis', () =>
       driftAnalysisStage(runId, affectedTopicIds, sourceVersionId)
-    )
+    );
 
-    const { paused } = await runStage(runId, 'repair_decision', () =>
-      repairDecisionStage(runId)
-    )
+    const { paused } = await runStage(runId, 'repair_decision', () => repairDecisionStage(runId));
 
-    if (paused) return
+    if (paused) return;
 
     // auto_applied drift items + any first-run topics in same pass
     await runStage(runId, 'generate', () =>
       generateStage(runId, sourceVersionId, firstRunTopicIds)
-    )
+    );
   }
 
   await db
     .update(pipelineRuns)
     .set({ status: 'completed', completedAt: new Date() })
-    .where(eq(pipelineRuns.id, runId))
+    .where(eq(pipelineRuns.id, runId));
 }
 ```
 
@@ -1468,6 +1509,7 @@ git commit -m "feat: add stage 7 (generate) and pipeline orchestrator"
 ## Task 10: API Routes — Pipeline Trigger + Run Status + Review
 
 **Files:**
+
 - Create: `src/app/api/sources/route.ts`
 - Create: `src/app/api/sources/[id]/route.ts`
 - Create: `src/app/api/sources/[id]/pipeline/route.ts`
@@ -1478,55 +1520,56 @@ git commit -m "feat: add stage 7 (generate) and pipeline orchestrator"
 - Create: `src/app/api/learning-units/[topicId]/route.ts`
 
 **Interfaces:**
+
 - Produces all REST endpoints consumed by the UI
 
 - [ ] **Step 1: Write sources API**
 
 ```typescript
 // src/app/api/sources/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { sources } from '@/db/schema'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { sources } from '@/db/schema';
 
 export async function GET() {
-  const all = await db.select().from(sources).orderBy(sources.createdAt)
-  return NextResponse.json(all)
+  const all = await db.select().from(sources).orderBy(sources.createdAt);
+  return NextResponse.json(all);
 }
 
 export async function POST(req: Request) {
-  const body = await req.json()
+  const body = await req.json();
   const [source] = await db
     .insert(sources)
     .values({ name: body.name, type: body.type, url: body.url ?? null })
-    .returning()
-  return NextResponse.json(source, { status: 201 })
+    .returning();
+  return NextResponse.json(source, { status: 201 });
 }
 ```
 
 ```typescript
 // src/app/api/sources/[id]/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { sources, topics, sourceVersions, pipelineRuns } from '@/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { sources, topics, sourceVersions, pipelineRuns } from '@/db/schema';
+import { eq, desc } from 'drizzle-orm';
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const [source] = await db.select().from(sources).where(eq(sources.id, params.id))
-  if (!source) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const [source] = await db.select().from(sources).where(eq(sources.id, params.id));
+  if (!source) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const sourceTopics = await db.select().from(topics).where(eq(topics.sourceId, params.id))
+  const sourceTopics = await db.select().from(topics).where(eq(topics.sourceId, params.id));
   const versions = await db
     .select()
     .from(sourceVersions)
     .where(eq(sourceVersions.sourceId, params.id))
-    .orderBy(desc(sourceVersions.createdAt))
+    .orderBy(desc(sourceVersions.createdAt));
   const runs = await db
     .select()
     .from(pipelineRuns)
     .where(eq(pipelineRuns.sourceId, params.id))
-    .orderBy(desc(pipelineRuns.triggeredAt))
+    .orderBy(desc(pipelineRuns.triggeredAt));
 
-  return NextResponse.json({ ...source, topics: sourceTopics, versions, runs })
+  return NextResponse.json({ ...source, topics: sourceTopics, versions, runs });
 }
 ```
 
@@ -1534,21 +1577,18 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 ```typescript
 // src/app/api/sources/[id]/pipeline/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { pipelineRuns } from '@/db/schema'
-import { runPipeline } from '@/pipeline/run'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { pipelineRuns } from '@/db/schema';
+import { runPipeline } from '@/pipeline/run';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const [run] = await db
-    .insert(pipelineRuns)
-    .values({ sourceId: params.id })
-    .returning()
+  const [run] = await db.insert(pipelineRuns).values({ sourceId: params.id }).returning();
 
   // Fire and forget — client polls /api/runs/[id] for status
-  runPipeline(run.id, params.id).catch(console.error)
+  runPipeline(run.id, params.id).catch(console.error);
 
-  return NextResponse.json({ runId: run.id }, { status: 202 })
+  return NextResponse.json({ runId: run.id }, { status: 202 });
 }
 ```
 
@@ -1556,17 +1596,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
 ```typescript
 // src/app/api/topics/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { topics } from '@/db/schema'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { topics } from '@/db/schema';
 
 export async function POST(req: Request) {
-  const body = await req.json()
+  const body = await req.json();
   const [topic] = await db
     .insert(topics)
     .values({ sourceId: body.sourceId, name: body.name, description: body.description })
-    .returning()
-  return NextResponse.json(topic, { status: 201 })
+    .returning();
+  return NextResponse.json(topic, { status: 201 });
 }
 ```
 
@@ -1574,23 +1614,30 @@ export async function POST(req: Request) {
 
 ```typescript
 // src/app/api/runs/[id]/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { pipelineRuns, pipelineStages, driftItems, proposedTopics, topics } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { pipelineRuns, pipelineStages, driftItems, proposedTopics, topics } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const [run] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.id, params.id))
-  if (!run) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const [run] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.id, params.id));
+  if (!run) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const stages = await db.select().from(pipelineStages).where(eq(pipelineStages.pipelineRunId, params.id))
-  const drift = await db.select({ item: driftItems, topic: topics })
+  const stages = await db
+    .select()
+    .from(pipelineStages)
+    .where(eq(pipelineStages.pipelineRunId, params.id));
+  const drift = await db
+    .select({ item: driftItems, topic: topics })
     .from(driftItems)
     .innerJoin(topics, eq(driftItems.topicId, topics.id))
-    .where(eq(driftItems.pipelineRunId, params.id))
-  const proposed = await db.select().from(proposedTopics).where(eq(proposedTopics.pipelineRunId, params.id))
+    .where(eq(driftItems.pipelineRunId, params.id));
+  const proposed = await db
+    .select()
+    .from(proposedTopics)
+    .where(eq(proposedTopics.pipelineRunId, params.id));
 
-  return NextResponse.json({ ...run, stages, driftItems: drift, proposedTopics: proposed })
+  return NextResponse.json({ ...run, stages, driftItems: drift, proposedTopics: proposed });
 }
 ```
 
@@ -1598,67 +1645,79 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
 ```typescript
 // src/app/api/review/drift/[id]/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { driftItems, pipelineRuns, sourceVersions } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { generateForTopic } from '@/pipeline/stages/generate'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { driftItems, pipelineRuns, sourceVersions } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { generateForTopic } from '@/pipeline/stages/generate';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { action } = await req.json() // action: 'approve' | 'reject'
+  const { action } = await req.json(); // action: 'approve' | 'reject'
 
-  const [item] = await db.select().from(driftItems).where(eq(driftItems.id, params.id))
-  if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const [item] = await db.select().from(driftItems).where(eq(driftItems.id, params.id));
+  if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   if (action === 'reject') {
-    await db.update(driftItems).set({ status: 'rejected' }).where(eq(driftItems.id, params.id))
-    return NextResponse.json({ ok: true })
+    await db.update(driftItems).set({ status: 'rejected' }).where(eq(driftItems.id, params.id));
+    return NextResponse.json({ ok: true });
   }
 
-  await db.update(driftItems).set({ status: 'approved' }).where(eq(driftItems.id, params.id))
+  await db.update(driftItems).set({ status: 'approved' }).where(eq(driftItems.id, params.id));
 
-  const [run] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.id, item.pipelineRunId))
-  await generateForTopic(item.topicId, run.sourceVersionId!, item.driftScore)
+  const [run] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.id, item.pipelineRunId));
+  await generateForTopic(item.topicId, run.sourceVersionId!, item.driftScore);
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true });
 }
 ```
 
 ```typescript
 // src/app/api/review/topics/[id]/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { proposedTopics, topics, pipelineRuns } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { generateForTopic } from '@/pipeline/stages/generate'
-import { runPipeline } from '@/pipeline/run'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { proposedTopics, topics, pipelineRuns } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { generateForTopic } from '@/pipeline/stages/generate';
+import { runPipeline } from '@/pipeline/run';
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const { action } = await req.json()
+  const { action } = await req.json();
 
-  const [proposed] = await db.select().from(proposedTopics).where(eq(proposedTopics.id, params.id))
-  if (!proposed) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const [proposed] = await db.select().from(proposedTopics).where(eq(proposedTopics.id, params.id));
+  if (!proposed) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   if (action === 'reject') {
-    await db.update(proposedTopics).set({ status: 'rejected', reviewedAt: new Date() }).where(eq(proposedTopics.id, params.id))
-    return NextResponse.json({ ok: true })
+    await db
+      .update(proposedTopics)
+      .set({ status: 'rejected', reviewedAt: new Date() })
+      .where(eq(proposedTopics.id, params.id));
+    return NextResponse.json({ ok: true });
   }
 
   // Approve: create topic, spawn new pipeline run (Extract + Generate only)
-  const [run] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.id, proposed.pipelineRunId))
+  const [run] = await db
+    .select()
+    .from(pipelineRuns)
+    .where(eq(pipelineRuns.id, proposed.pipelineRunId));
 
-  const [newTopic] = await db.insert(topics).values({
-    sourceId: run.sourceId,
-    name: proposed.name,
-    description: proposed.description,
-  }).returning()
+  const [newTopic] = await db
+    .insert(topics)
+    .values({
+      sourceId: run.sourceId,
+      name: proposed.name,
+      description: proposed.description,
+    })
+    .returning();
 
-  await db.update(proposedTopics).set({ status: 'approved', reviewedAt: new Date() }).where(eq(proposedTopics.id, params.id))
+  await db
+    .update(proposedTopics)
+    .set({ status: 'approved', reviewedAt: new Date() })
+    .where(eq(proposedTopics.id, params.id));
 
   // Generate learning unit directly from proposed content
-  await generateForTopic(newTopic.id, proposed.sourceVersionId, null)
+  await generateForTopic(newTopic.id, proposed.sourceVersionId, null);
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true });
 }
 ```
 
@@ -1666,10 +1725,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
 ```typescript
 // src/app/api/learning-units/[topicId]/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { learningUnits, learningUnitVersions } from '@/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { learningUnits, learningUnitVersions } from '@/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
 
 export async function GET(_req: Request, { params }: { params: { topicId: string } }) {
   const units = await db
@@ -1683,9 +1742,9 @@ export async function GET(_req: Request, { params }: { params: { topicId: string
       )
     )
     .where(eq(learningUnits.topicId, params.topicId))
-    .orderBy(desc(learningUnitVersions.createdAt))
+    .orderBy(desc(learningUnitVersions.createdAt));
 
-  return NextResponse.json(units)
+  return NextResponse.json(units);
 }
 ```
 
@@ -1701,10 +1760,12 @@ git commit -m "feat: add all API routes (sources, topics, pipeline, runs, review
 ## Task 11: App Layout + Navigation
 
 **Files:**
+
 - Modify: `src/app/layout.tsx`
 - Create: `src/app/page.tsx`
 
 **Interfaces:**
+
 - Produces: left nav with Admin / Learner sections, accessible at all routes
 
 - [ ] **Step 1: Write root layout with left nav**
@@ -1749,9 +1810,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ```typescript
 // src/app/page.tsx
-import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation';
 export default function Home() {
-  redirect('/admin/sources')
+  redirect('/admin/sources');
 }
 ```
 
@@ -1775,11 +1836,13 @@ git commit -m "feat: add root layout with admin/learner left nav"
 ## Task 12: Admin — Sources Pages
 
 **Files:**
+
 - Create: `src/app/admin/sources/page.tsx`
 - Create: `src/app/admin/sources/[id]/page.tsx`
 - Create: `src/app/admin/sources/[id]/topics/new/page.tsx`
 
 **Interfaces:**
+
 - Consumes: `GET /api/sources`, `POST /api/sources`, `GET /api/sources/[id]`, `POST /api/topics`, `POST /api/sources/[id]/pipeline`
 
 - [ ] **Step 1: Write sources list page**
@@ -2032,9 +2095,11 @@ git commit -m "feat: add admin sources list, source detail, and add topic pages"
 ## Task 13: Admin — Pipeline Run Page
 
 **Files:**
+
 - Create: `src/app/admin/runs/[id]/page.tsx`
 
 **Interfaces:**
+
 - Consumes: `GET /api/runs/[id]` (polls every 2s while running)
 
 - [ ] **Step 1: Write pipeline run page**
@@ -2148,20 +2213,22 @@ git commit -m "feat: add pipeline run detail page with live polling"
 ## Task 14: Admin — Review Queue
 
 **Files:**
+
 - Create: `src/app/admin/review/page.tsx`
 - Create: `src/app/api/review/queue/route.ts`
 
 **Interfaces:**
+
 - Consumes: review queue API, `POST /api/review/drift/[id]`, `POST /api/review/topics/[id]`
 
 - [ ] **Step 1: Write review queue API**
 
 ```typescript
 // src/app/api/review/queue/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { driftItems, proposedTopics, topics, pipelineRuns } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { driftItems, proposedTopics, topics, pipelineRuns } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET() {
   const pendingDrift = await db
@@ -2169,14 +2236,14 @@ export async function GET() {
     .from(driftItems)
     .innerJoin(topics, eq(driftItems.topicId, topics.id))
     .innerJoin(pipelineRuns, eq(driftItems.pipelineRunId, pipelineRuns.id))
-    .where(eq(driftItems.status, 'pending_review'))
+    .where(eq(driftItems.status, 'pending_review'));
 
   const pendingTopics = await db
     .select()
     .from(proposedTopics)
-    .where(eq(proposedTopics.status, 'pending_approval'))
+    .where(eq(proposedTopics.status, 'pending_approval'));
 
-  return NextResponse.json({ pendingDrift, pendingTopics })
+  return NextResponse.json({ pendingDrift, pendingTopics });
 }
 ```
 
@@ -2297,29 +2364,31 @@ git commit -m "feat: add review queue page with approve/reject for drift items a
 ## Task 15: Learner UI
 
 **Files:**
+
 - Create: `src/app/learner/page.tsx`
 - Create: `src/app/learner/topics/[id]/page.tsx`
 - Create: `src/app/api/topics/all/route.ts`
 
 **Interfaces:**
+
 - Consumes: topics list API, `GET /api/learning-units/[topicId]`
 
 - [ ] **Step 1: Write all-topics API**
 
 ```typescript
 // src/app/api/topics/all/route.ts
-import { NextResponse } from 'next/server'
-import { db } from '@/db'
-import { topics, sources } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { NextResponse } from 'next/server';
+import { db } from '@/db';
+import { topics, sources } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET() {
   const all = await db
     .select({ topic: topics, source: sources })
     .from(topics)
     .innerJoin(sources, eq(topics.sourceId, sources.id))
-    .orderBy(sources.name, topics.name)
-  return NextResponse.json(all)
+    .orderBy(sources.name, topics.name);
+  return NextResponse.json(all);
 }
 ```
 
@@ -2462,6 +2531,7 @@ git commit -m "feat: add learner UI — browse topics and learning unit reveal v
 ## Task 16: Final Wiring + Vercel Deploy
 
 **Files:**
+
 - Create: `next.config.ts` (if not exists)
 - Create: `README.md`
 

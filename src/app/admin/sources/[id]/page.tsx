@@ -1,86 +1,107 @@
-'use client'
-import { useEffect, useRef, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Upload, FileText, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { fmtDate } from '@/lib/utils'
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Upload, FileText, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { fmtDate } from '@/lib/utils';
 
-type Topic = { id: string; name: string; description: string }
-type Run = { id: string; status: 'running' | 'completed' | 'failed' | 'awaiting_review'; triggeredAt: string; sourceVersionId: string | null }
-type Version = { id: string; contentHash: string; createdAt: string }
+type Topic = { id: string; name: string; description: string };
+type Run = {
+  id: string;
+  status: 'running' | 'completed' | 'failed' | 'awaiting_review';
+  triggeredAt: string;
+  sourceVersionId: string | null;
+};
+type Version = { id: string; contentHash: string; createdAt: string };
 type SourceDetail = {
-  id: string; name: string; type: 'url' | 'pdf' | 'md'
-  url: string | null; createdAt: string
-  topics: Topic[]; runs: Run[]; versions: Version[]
-}
+  id: string;
+  name: string;
+  type: 'html' | 'pdf';
+  url: string | null;
+  createdAt: string;
+  topics: Topic[];
+  runs: Run[];
+  versions: Version[];
+};
 
 function statusVariant(s: Run['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (s === 'completed') return 'default'
-  if (s === 'failed') return 'destructive'
-  return 'secondary'
+  if (s === 'completed') return 'default';
+  if (s === 'failed') return 'destructive';
+  return 'secondary';
 }
 
 function fmtSize(bytes: number) {
   return bytes < 1024 * 1024
     ? `${Math.round(bytes / 1024)} KB`
-    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function SourceDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const router = useRouter()
-  const [source, setSource] = useState<SourceDetail | null>(null)
-  const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [dragOver, setDragOver] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [source, setSource] = useState<SourceDetail | null>(null);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/sources/${id}`)
       .then((r) => r.json())
       .then(setSource)
-      .catch(console.error)
-  }, [id])
+      .catch(console.error);
+  }, [id]);
 
   function handleFileChange(file: File | null) {
-    if (!file || !source) return
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    const valid = source.type === 'pdf' ? ext === 'pdf' : ['md', 'markdown', 'txt'].includes(ext ?? '')
-    if (!valid) { setError(`Expected a .${source.type} file.`); return }
-    setError(null)
-    setSelectedFile(file)
+    if (!file || !source) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const valid = ext === 'pdf';
+    if (!valid) {
+      setError(`Expected a .${source.type} file.`);
+      return;
+    }
+    setError(null);
+    setSelectedFile(file);
   }
 
   function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    handleFileChange(e.dataTransfer.files[0] ?? null)
+    e.preventDefault();
+    setDragOver(false);
+    handleFileChange(e.dataTransfer.files[0] ?? null);
   }
 
   async function triggerPipeline() {
-    if (!source) return
-    setError(null)
-    setRunning(true)
+    if (!source) return;
+    setError(null);
+    setRunning(true);
 
     // Upload a new file only if one was explicitly selected
-    const body = selectedFile ? (() => { const fd = new FormData(); fd.append('file', selectedFile); return fd })() : undefined
-    const res = await fetch(`/api/sources/${id}/pipeline`, { method: 'POST', body })
-    setRunning(false)
+    const body = selectedFile
+      ? (() => {
+          const fd = new FormData();
+          fd.append('file', selectedFile);
+          return fd;
+        })()
+      : undefined;
+    const res = await fetch(`/api/sources/${id}/pipeline`, { method: 'POST', body });
+    setRunning(false);
 
-    if (!res.ok) { setError(((await res.json()) as { error?: string }).error ?? 'Pipeline trigger failed.'); return }
-    const { runId } = (await res.json()) as { runId: string }
-    router.push(`/admin/pipeline/${runId}`)
+    if (!res.ok) {
+      setError(((await res.json()) as { error?: string }).error ?? 'Pipeline trigger failed.');
+      return;
+    }
+    const { runId } = (await res.json()) as { runId: string };
+    router.push(`/admin/pipeline/${runId}`);
   }
 
-  if (!source) return <p className="text-muted-foreground text-sm">Loading...</p>
+  if (!source) return <p className="text-muted-foreground text-sm">Loading...</p>;
 
-  // A file is required only when type is pdf/md AND no URL is stored yet
-  const needsFile = (source.type === 'pdf' || source.type === 'md') && !source.url
-  const accept = source.type === 'pdf' ? '.pdf' : '.md,.markdown,.txt'
+  const needsFile = source.type === 'pdf' && !source.url;
+  const accept = '.pdf';
 
   return (
     <div className="space-y-6">
@@ -95,10 +116,7 @@ export default function SourceDetailPage() {
             )}
           </div>
         </div>
-        <Button
-          onClick={triggerPipeline}
-          disabled={running || (needsFile && !selectedFile)}
-        >
+        <Button onClick={triggerPipeline} disabled={running || (needsFile && !selectedFile)}>
           {running ? 'Triggering…' : 'Run Pipeline'}
         </Button>
       </div>
@@ -118,9 +136,14 @@ export default function SourceDetailPage() {
             <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
               <FileText className="size-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate text-sm font-medium">{selectedFile.name}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">{fmtSize(selectedFile.size)}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {fmtSize(selectedFile.size)}
+              </span>
               <button
-                onClick={() => { setSelectedFile(null); if (fileRef.current) fileRef.current.value = '' }}
+                onClick={() => {
+                  setSelectedFile(null);
+                  if (fileRef.current) fileRef.current.value = '';
+                }}
                 className="rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Remove file"
               >
@@ -131,7 +154,10 @@ export default function SourceDetailPage() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
               onDragLeave={() => setDragOver(false)}
               onDrop={onDrop}
               className={[
@@ -143,9 +169,7 @@ export default function SourceDetailPage() {
             >
               <Upload className="mx-auto mb-3 size-5 text-muted-foreground" />
               <p className="text-sm font-medium">Drop your file here, or click to browse</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {source.type === 'pdf' ? 'PDF files only' : 'Markdown or text files (.md, .txt)'}
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">PDF files only</p>
             </button>
           )}
 
@@ -161,9 +185,12 @@ export default function SourceDetailPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {source.versions.map((v, i) => {
-              const run = source.runs.find(r => r.sourceVersionId === v.id)
+              const run = source.runs.find((r) => r.sourceVersionId === v.id);
               return (
-                <div key={v.id} className="flex items-center justify-between border rounded px-3 py-2 gap-3">
+                <div
+                  key={v.id}
+                  className="flex items-center justify-between border rounded px-3 py-2 gap-3"
+                >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-xs text-muted-foreground shrink-0">
                       {i === 0 ? 'Latest' : `v${source.versions.length - i}`}
@@ -176,12 +203,15 @@ export default function SourceDetailPage() {
                     </span>
                   </div>
                   {run && (
-                    <Link href={`/admin/pipeline/${run.id}`} className="text-xs text-primary hover:underline shrink-0">
+                    <Link
+                      href={`/admin/pipeline/${run.id}`}
+                      className="text-xs text-primary hover:underline shrink-0"
+                    >
                       View run →
                     </Link>
                   )}
                 </div>
-              )
+              );
             })}
           </CardContent>
         </Card>
@@ -192,7 +222,9 @@ export default function SourceDetailPage() {
         <CardHeader className="flex-row items-center justify-between pb-2">
           <CardTitle className="text-base">Topics</CardTitle>
           <Link href={`/admin/sources/${id}/topics/new`}>
-            <Button variant="outline" size="sm">Add Topic</Button>
+            <Button variant="outline" size="sm">
+              Add Topic
+            </Button>
           </Link>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -219,7 +251,9 @@ export default function SourceDetailPage() {
               <div className="flex items-center justify-between border rounded p-3 hover:bg-accent/50 transition-colors cursor-pointer">
                 <span className="text-xs text-muted-foreground font-mono">{r.id.slice(0, 8)}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground" suppressHydrationWarning>{fmtDate(r.triggeredAt)}</span>
+                  <span className="text-xs text-muted-foreground" suppressHydrationWarning>
+                    {fmtDate(r.triggeredAt)}
+                  </span>
                   <Badge variant={statusVariant(r.status)}>{r.status}</Badge>
                 </div>
               </div>
@@ -231,5 +265,5 @@ export default function SourceDetailPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

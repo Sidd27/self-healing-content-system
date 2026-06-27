@@ -1,5 +1,5 @@
-import { defineConfig } from 'vitest/config'
-import path from 'path'
+import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
   resolve: {
@@ -11,4 +11,4 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
   },
-})
+});
