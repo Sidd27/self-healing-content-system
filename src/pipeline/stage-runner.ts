@@ -7,8 +7,25 @@ type StageName = typeof pipelineStages.$inferInsert['stage']
 export async function runStage<T>(
   pipelineRunId: string,
   stageName: StageName,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  opts?: { onResume: () => Promise<T> }
 ): Promise<T> {
+  // Idempotency: if this stage already completed (resume case), skip re-running
+  if (opts?.onResume) {
+    const [existing] = await db
+      .select({ status: pipelineStages.status })
+      .from(pipelineStages)
+      .where(
+        and(
+          eq(pipelineStages.pipelineRunId, pipelineRunId),
+          eq(pipelineStages.stage, stageName)
+        )
+      )
+    if (existing?.status === 'completed') {
+      return opts.onResume()
+    }
+  }
+
   await db.insert(pipelineStages).values({
     pipelineRunId,
     stage: stageName,
@@ -48,6 +65,18 @@ export async function runStage<T>(
 }
 
 export async function skipStage(pipelineRunId: string, stageName: StageName) {
+  // Idempotency: don't insert duplicate skipped record on resume
+  const [existing] = await db
+    .select({ id: pipelineStages.id })
+    .from(pipelineStages)
+    .where(
+      and(
+        eq(pipelineStages.pipelineRunId, pipelineRunId),
+        eq(pipelineStages.stage, stageName)
+      )
+    )
+  if (existing) return
+
   await db.insert(pipelineStages).values({
     pipelineRunId,
     stage: stageName,
