@@ -19,7 +19,7 @@ export async function extractTopicsStage(
   sourceId: string,
   sourceVersionId: string,
   normalizedContent: string
-): Promise<{ affectedTopicIds: string[]; firstRunTopicIds: string[] }> {
+): Promise<{ affectedTopicIds: string[]; firstRunTopicIds: string[]; proposedCount: number }> {
   const sourceTopics = await db
     .select()
     .from(topics)
@@ -66,6 +66,7 @@ export async function extractTopicsStage(
   }
 
   // Propose new topics from content not covered by existing topics
+  let proposedCount = 0
   if (sourceTopics.length > 0) {
     const existingNames = sourceTopics.map(t => t.name)
     const { output: proposed } = await generateText({
@@ -76,6 +77,7 @@ export async function extractTopicsStage(
     })
 
     if (proposed.length > 0) {
+      proposedCount = proposed.length
       await db.insert(proposedTopics).values(
         proposed.map(p => ({
           sourceVersionId,
@@ -89,5 +91,5 @@ export async function extractTopicsStage(
     }
   }
 
-  return { affectedTopicIds, firstRunTopicIds }
+  return { affectedTopicIds, firstRunTopicIds, proposedCount }
 }

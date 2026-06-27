@@ -34,14 +34,22 @@ export async function runPipeline(
     return
   }
 
-  const { affectedTopicIds, firstRunTopicIds } = await runStage(runId, 'extract_topics', () =>
+  const { affectedTopicIds, firstRunTopicIds, proposedCount } = await runStage(runId, 'extract_topics', () =>
     extractTopicsStage(runId, sourceId, sourceVersionId, normalized)
   )
 
   if (affectedTopicIds.length === 0) {
     await skipStage(runId, 'drift_analysis')
     await skipStage(runId, 'repair_decision')
-    // First-run topics go straight to generate (no drift to analyze)
+
+    if (firstRunTopicIds.length === 0 && proposedCount > 0) {
+      // No pre-defined topics — only LLM proposals which need human approval first
+      await skipStage(runId, 'generate')
+      await db.update(pipelineRuns).set({ status: 'awaiting_review', completedAt: new Date() }).where(eq(pipelineRuns.id, runId))
+      return
+    }
+
+    // Pre-defined topics on first run go straight to generate (admin already approved these topics)
     await runStage(runId, 'generate', () =>
       generateStage(runId, sourceVersionId, firstRunTopicIds)
     )
