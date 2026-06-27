@@ -113,7 +113,7 @@ export default function SourceDetailPage() {
           {isPdf && (
             <label className="inline-flex items-center gap-1.5 h-7 cursor-pointer rounded-md border border-input bg-background px-2.5 text-xs font-medium shadow-sm hover:bg-muted/60 transition-colors">
               <Paperclip className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate max-w-[120px]">
+              <span className="truncate max-w-30">
                 {pdfFile?.name ?? (mustAttach ? 'Attach PDF' : 'Upload new PDF')}
               </span>
               <input
