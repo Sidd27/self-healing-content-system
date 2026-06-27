@@ -160,6 +160,7 @@ export default function PipelineRunPage() {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  const [epoch, setEpoch] = useState(0);
   const statusRef = useRef<RunStatus | null>(null);
 
   async function rerun() {
@@ -168,10 +169,8 @@ export default function PipelineRunPage() {
     try {
       const res = await fetch(`/api/pipeline/${run.id}/resume`, { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
-      // Unlock the polling gate so the interval keeps firing, then do one immediate reload
-      statusRef.current = "running";
-      const refreshed = await fetch(`/api/pipeline/${run.id}`);
-      if (refreshed.ok) setRun(await refreshed.json());
+      // Bump epoch to remount the polling effect — restarts interval and does immediate load()
+      setEpoch((e) => e + 1);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Resume failed");
     } finally {
@@ -215,7 +214,7 @@ export default function PipelineRunPage() {
       active = false;
       clearInterval(interval);
     };
-  }, [runId]);
+  }, [runId, epoch]);
 
   if (error) {
     return <p className="text-destructive text-sm">{error}</p>;

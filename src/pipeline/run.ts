@@ -1,6 +1,6 @@
 import { db } from '@/db'
-import { pipelineRuns, driftItems } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { pipelineRuns, driftItems, topics, topicExtractions } from '@/db/schema'
+import { eq, desc } from 'drizzle-orm'
 import { runStage, skipStage } from './stage-runner'
 import { ingestStage } from './stages/ingest'
 import { normalizeStage } from './stages/normalize'
@@ -44,7 +44,8 @@ export async function runPipeline(
       onResume: async () => {
         const [run] = await db.select({ sourceVersionId: pipelineRuns.sourceVersionId })
           .from(pipelineRuns).where(eq(pipelineRuns.id, runId))
-        return { stopped: false, sourceVersionId: run.sourceVersionId! }
+        if (!run?.sourceVersionId) throw new Error(`sourceVersionId missing after hash_check for run ${runId}`)
+        return { stopped: false, sourceVersionId: run.sourceVersionId }
       },
     }
   )
@@ -63,44 +64,64 @@ export async function runPipeline(
     () => extractTopicsStage(runId, sourceId, sourceVersionId, normalized),
     {
       onResume: async () => {
-        // Reconstruct from drift_items created during original extract run
-        const items = await db.select().from(driftItems)
-          .where(eq(driftItems.pipelineRunId, runId))
-        const firstRunIds = items
-          .filter(d => d.changeType === 'FIRST_EXTRACTION')
-          .map(d => d.topicId)
-        const affectedIds = items
-          .filter(d => d.changeType !== 'FIRST_EXTRACTION')
-          .map(d => d.topicId)
-        return { affectedTopicIds: affectedIds, firstRunTopicIds: firstRunIds, proposedCount: 0 }
+        // Reconstruct from topicExtractions — works even if drift_analysis never ran
+        const sourceTopics = await db.select().from(topics)
+          .where(eq(topics.sourceId, sourceId))
+        const firstRunTopicIds: string[] = []
+        const affectedTopicIds: string[] = []
+        for (const topic of sourceTopics) {
+          const extractions = await db.select()
+            .from(topicExtractions)
+            .where(eq(topicExtractions.topicId, topic.id))
+            .orderBy(desc(topicExtractions.createdAt))
+          const wasExtractedThisVersion = extractions.some(e => e.sourceVersionId === sourceVersionId)
+          if (!wasExtractedThisVersion) continue
+          const hadPriorVersion = extractions.some(e => e.sourceVersionId !== sourceVersionId)
+          if (hadPriorVersion) {
+            affectedTopicIds.push(topic.id)
+          } else {
+            firstRunTopicIds.push(topic.id)
+          }
+        }
+        return { affectedTopicIds, firstRunTopicIds, proposedCount: 0 }
       },
     }
   )
 
   if (affectedTopicIds.length === 0) {
     await skipStage(runId, 'drift_analysis')
-    const { paused } = await runStage(runId, 'repair_decision', () =>
-      repairDecisionStage(runId)
+    const { paused } = await runStage(
+      runId, 'repair_decision',
+      () => repairDecisionStage(runId),
+      { onResume: () => repairDecisionStage(runId) }
     )
     if (paused) {
       await skipStage(runId, 'generate')
     } else {
-      await runStage(runId, 'generate', () =>
-        generateStage(runId, sourceVersionId, firstRunTopicIds)
+      await runStage(
+        runId, 'generate',
+        () => generateStage(runId, sourceVersionId, firstRunTopicIds),
+        { onResume: async () => {} }
       )
     }
   } else {
-    await runStage(runId, 'drift_analysis', () =>
-      driftAnalysisStage(runId, affectedTopicIds, sourceVersionId)
+    await runStage(
+      runId, 'drift_analysis',
+      () => driftAnalysisStage(runId, affectedTopicIds, sourceVersionId),
+      { onResume: async () => {} }
     )
-    const { paused } = await runStage(runId, 'repair_decision', () =>
-      repairDecisionStage(runId)
+    const { paused } = await runStage(
+      runId, 'repair_decision',
+      () => repairDecisionStage(runId),
+      { onResume: () => repairDecisionStage(runId) }
     )
     if (paused) {
       await skipStage(runId, 'generate')
     } else {
-      await runStage(runId, 'generate', () =>
-        generateStage(runId, sourceVersionId, firstRunTopicIds)
+      await runStage(
+        runId, 'generate',
+        () => generateStage(runId, sourceVersionId, firstRunTopicIds),
+        { onResume: async () => {} }
       )
     }
   }
