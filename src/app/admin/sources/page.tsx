@@ -47,7 +47,7 @@ export default function SourcesPage() {
         body: JSON.stringify({
           name: form.name,
           type: form.type,
-          url: form.type === 'url' ? form.url : undefined,
+          url: form.url || undefined,
         }),
       })
       setOpen(false)
@@ -88,7 +88,17 @@ export default function SourcesPage() {
               {form.type === 'url' && (
                 <input
                   className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="https://..."
+                  placeholder="https://example.com/page"
+                  type="url"
+                  value={form.url}
+                  onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+                  required
+                />
+              )}
+              {form.type === 'pdf' && (
+                <input
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  placeholder="https://example.com/doc.pdf (optional — or upload on source page)"
                   type="url"
                   value={form.url}
                   onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
