@@ -18,6 +18,86 @@ Learning content built on top of a source document (exam guide, technical spec, 
 
 ---
 
+## Setup
+
+### Prerequisites
+
+- Node.js 20+
+- [Supabase](https://supabase.com) project (free tier works)
+- LLM: local [Ollama](https://ollama.ai) **or** [OpenRouter](https://openrouter.ai) key
+
+### 1. Clone and install
+
+```bash
+git clone <repo-url>
+cd self-healing-content-system
+npm install
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.local.example .env.local
+```
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Supabase → Settings → Database → **Transaction pooler** URL, port **6543** |
+| `SUPABASE_URL` | Supabase → Settings → API → Project URL |
+| `SUPABASE_SECRET_KEY` | Supabase → Settings → API → `service_role` secret |
+| `OPENAI_BASE_URL` | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1` |
+| `LLM_MODEL_NAME` | e.g. `llama3:8b` or `qwen3.5:latest` |
+| `LLM_API_KEY` | `ollama` (local) or your OpenRouter key |
+| `EMBEDDING_MODEL_NAME` | `nomic-embed-text:latest` (Ollama) or `text-embedding-3-small` (cloud) |
+| `EMBEDDING_BASE_URL` | Only needed if embeddings use a different endpoint than LLM |
+| `DEBUG_LOGS` | `true` to enable verbose pipeline logs |
+
+#### Local (Ollama)
+
+```bash
+ollama pull llama3:8b
+ollama pull nomic-embed-text
+```
+
+```env
+OPENAI_BASE_URL=http://localhost:11434/v1
+LLM_MODEL_NAME=llama3:8b
+LLM_API_KEY=ollama
+EMBEDDING_MODEL_NAME=nomic-embed-text:latest
+```
+
+#### Cloud (OpenRouter + OpenAI embeddings)
+
+```env
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL_NAME=meta-llama/llama-3.1-8b-instruct:free
+LLM_API_KEY=sk-or-...
+
+EMBEDDING_BASE_URL=https://api.openai.com/v1
+EMBEDDING_MODEL_NAME=text-embedding-3-small
+LLM_API_KEY=sk-...   # reuse or set EMBEDDING_API_KEY separately
+```
+
+### 3. Supabase storage bucket
+
+Supabase → Storage → **New bucket** → name: `source-files` → enable **Public**.
+
+### 4. Push schema
+
+```bash
+npx drizzle-kit push
+```
+
+### 5. Run
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
 ## System Design
 
 ### Pipeline Overview
@@ -361,86 +441,6 @@ src/
 └── mastra/
     └── index.ts              # extractionAgent, driftAgent, generationAgent
 ```
-
----
-
-## Setup
-
-### Prerequisites
-
-- Node.js 20+
-- [Supabase](https://supabase.com) project (free tier works)
-- LLM: local [Ollama](https://ollama.ai) **or** [OpenRouter](https://openrouter.ai) key
-
-### 1. Clone and install
-
-```bash
-git clone <repo-url>
-cd self-healing-content-system
-npm install
-```
-
-### 2. Configure environment
-
-```bash
-cp .env.local.example .env.local
-```
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | Supabase → Settings → Database → **Transaction pooler** URL, port **6543** |
-| `SUPABASE_URL` | Supabase → Settings → API → Project URL |
-| `SUPABASE_SECRET_KEY` | Supabase → Settings → API → `service_role` secret |
-| `OPENAI_BASE_URL` | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1` |
-| `LLM_MODEL_NAME` | e.g. `llama3:8b` or `qwen3.5:latest` |
-| `LLM_API_KEY` | `ollama` (local) or your OpenRouter key |
-| `EMBEDDING_MODEL_NAME` | `nomic-embed-text:latest` (Ollama) or `text-embedding-3-small` (cloud) |
-| `EMBEDDING_BASE_URL` | Only needed if embeddings use a different endpoint than LLM |
-| `DEBUG_LOGS` | `true` to enable verbose pipeline logs |
-
-#### Local (Ollama)
-
-```bash
-ollama pull llama3:8b
-ollama pull nomic-embed-text
-```
-
-```env
-OPENAI_BASE_URL=http://localhost:11434/v1
-LLM_MODEL_NAME=llama3:8b
-LLM_API_KEY=ollama
-EMBEDDING_MODEL_NAME=nomic-embed-text:latest
-```
-
-#### Cloud (OpenRouter + OpenAI embeddings)
-
-```env
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-LLM_MODEL_NAME=meta-llama/llama-3.1-8b-instruct:free
-LLM_API_KEY=sk-or-...
-
-EMBEDDING_BASE_URL=https://api.openai.com/v1
-EMBEDDING_MODEL_NAME=text-embedding-3-small
-LLM_API_KEY=sk-...   # reuse or set EMBEDDING_API_KEY separately
-```
-
-### 3. Supabase storage bucket
-
-Supabase → Storage → **New bucket** → name: `source-files` → enable **Public**.
-
-### 4. Push schema
-
-```bash
-npx drizzle-kit push
-```
-
-### 5. Run
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
