@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { topics, topicExtractions, proposedTopics } from '@/db/schema'
+import { topics, topicExtractions, proposedTopics, driftItems } from '@/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
@@ -7,6 +7,7 @@ import { normalizeContent, hashContent } from '@/lib/normalize'
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts'
 import { llmModel } from '@/lib/llm'
 import { LLM_TIMEOUT_MS } from '@/lib/constants'
+import { computeDriftLevel } from './repair-decision'
 
 const ProposedTopicsSchema = z.array(z.object({
   name: z.string(),
@@ -60,6 +61,16 @@ export async function extractTopicsStage(
 
     if (!previousExtraction) {
       firstRunTopicIds.push(topic.id)
+      // Create a pending_review drift item so repair_decision pauses for human approval
+      await db.insert(driftItems).values({
+        pipelineRunId: runId,
+        topicId: topic.id,
+        changeType: 'FIRST_EXTRACTION',
+        driftScore: 0.0,
+        driftLevel: computeDriftLevel(0.0),
+        reason: 'First extraction — requires human approval before generating learning unit.',
+        status: 'pending_review',
+      })
     } else {
       affectedTopicIds.push(topic.id)
     }
