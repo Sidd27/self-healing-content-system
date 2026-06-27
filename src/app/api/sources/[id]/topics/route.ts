@@ -13,7 +13,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const { name, description } = await req.json() as { name: string; description: string }
+
+  let body: { name?: unknown; description?: unknown }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { name, description } = body as { name?: string; description?: string }
 
   if (!name?.trim() || !description?.trim()) {
     return NextResponse.json({ error: 'name and description are required' }, { status: 400 })
