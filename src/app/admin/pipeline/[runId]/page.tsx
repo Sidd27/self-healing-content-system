@@ -202,12 +202,11 @@ export default function PipelineRunPage() {
 
     load();
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
+      await load();
       if (statusRef.current && TERMINAL_STATUSES.includes(statusRef.current)) {
         clearInterval(interval);
-        return;
       }
-      load();
     }, 2000);
 
     return () => {
