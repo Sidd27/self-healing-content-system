@@ -1,6 +1,6 @@
 import { db } from '@/db'
-import { pipelineRuns, sourceVersions, driftItems, topicExtractions, topics } from '@/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
+import { pipelineRuns, sourceVersions, driftItems } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 import { runStage, skipStage } from './stage-runner'
 import { ingestStage } from './stages/ingest'
 import { normalizeStage } from './stages/normalize'
@@ -32,13 +32,7 @@ export async function runPipeline(
     runId, 'normalize',
     () => normalizeStage(runId, rawContent),
     {
-      onResume: async () => {
-        const [run] = await db.select({ sourceVersionId: pipelineRuns.sourceVersionId })
-          .from(pipelineRuns).where(eq(pipelineRuns.id, runId))
-        const [sv] = await db.select().from(sourceVersions)
-          .where(eq(sourceVersions.id, run.sourceVersionId!))
-        return { normalized: sv.normalizedContent, hash: sv.contentHash }
-      },
+      onResume: async () => normalizeStage(runId, rawContent),
     }
   )
 
