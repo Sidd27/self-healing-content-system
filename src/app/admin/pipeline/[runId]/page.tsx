@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -157,7 +157,6 @@ function DriftLevelBadge({ level }: { level: "low" | "med" | "high" }) {
 
 export default function PipelineRunPage() {
   const { runId } = useParams<{ runId: string }>();
-  const router = useRouter();
   const [run, setRun] = useState<RunDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
@@ -167,12 +166,12 @@ export default function PipelineRunPage() {
     if (!run) return;
     setRerunning(true);
     try {
-      const res = await fetch(`/api/sources/${run.sourceId}/pipeline`, { method: "POST" });
+      const res = await fetch(`/api/pipeline/${run.id}/resume`, { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
-      const { runId: newRunId } = await res.json();
-      router.push(`/admin/pipeline/${newRunId}`);
+      // Stay on the same page — polling will pick up the resumed run
+      setRerunning(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Re-run failed");
+      alert(err instanceof Error ? err.message : "Resume failed");
       setRerunning(false);
     }
   }
