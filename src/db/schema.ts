@@ -9,8 +9,6 @@ export const pipelineStatusEnum = pgEnum('pipeline_status', [
 ]);
 export const stageNameEnum = pgEnum('stage_name', [
   'ingest',
-  'normalize',
-  'hash_check',
   'extract_topics',
   'drift_analysis',
   'repair_decision',

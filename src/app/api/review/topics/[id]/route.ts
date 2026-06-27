@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { proposedTopics, topics, pipelineRuns, topicExtractions } from '@/db/schema';
+import { proposedTopics, topics, pipelineRuns, topicExtractions, sourceVersions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateForTopic } from '@/pipeline/stages/generate';
 import { normalizeText, hashContent } from '@/lib/utils';
-import { tryCompleteRun } from '@/lib/close-run';
+import { markGenerateRunning, tryCompleteRun } from '@/lib/close-run';
+import { extractionAgent } from '@/mastra';
+import { buildExtractPrompt } from '@/pipeline/prompts';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,8 +41,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       })
       .returning();
 
-    // Seed topicExtractions so generateForTopic can find content for this brand-new topic
-    const normalized = normalizeText(proposed.extractedContent);
+    // Re-extract using buildExtractPrompt so the seeded baseline matches the prompt
+    // used by extract-topics stage on every future run (proposed.extractedContent used
+    // a different prompt, making hash comparison meaningless).
+    const [version] = await db
+      .select({ normalizedContent: sourceVersions.normalizedContent })
+      .from(sourceVersions)
+      .where(eq(sourceVersions.id, proposed.sourceVersionId));
+    const rawExtracted = version
+      ? (await extractionAgent.generate(buildExtractPrompt(proposed.name, proposed.description, version.normalizedContent))).text
+      : proposed.extractedContent;
+    const normalized = normalizeText(rawExtracted);
     await db.insert(topicExtractions).values({
       topicId: newTopic.id,
       sourceVersionId: proposed.sourceVersionId,
@@ -54,6 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .where(eq(proposedTopics.id, id));
 
     // Generate learning unit from the proposed content
+    await markGenerateRunning(proposed.pipelineRunId);
     await generateForTopic(newTopic.id, proposed.sourceVersionId, null);
     await tryCompleteRun(proposed.pipelineRunId);
 

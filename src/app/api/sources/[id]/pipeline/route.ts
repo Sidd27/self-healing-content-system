@@ -12,20 +12,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!source) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   if (source.type === 'pdf') {
-    if (!source.url) {
-      // First run — file upload required
+    let hasUrl = !!source.url;
+    const contentType = req.headers.get('content-type') ?? '';
+    if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       const file = formData.get('file');
-      if (!file || typeof file === 'string') {
-        return NextResponse.json(
-          { error: 'File required for pdf sources on first run' },
-          { status: 400 }
-        );
+      if (file && typeof file !== 'string') {
+        const { url } = await uploadSourceFile(id, file as File);
+        await db.update(sources).set({ url }).where(eq(sources.id, id));
+        hasUrl = true;
       }
-      const { url } = await uploadSourceFile(id, file as File);
-      await db.update(sources).set({ url }).where(eq(sources.id, id));
     }
-    // Re-run: source.url already set from previous upload — nothing to do
+    if (!hasUrl) {
+      return NextResponse.json({ error: 'File required for pdf sources' }, { status: 400 });
+    }
   }
 
   const [run] = await db

@@ -1,10 +1,11 @@
 import { db } from '@/db';
-import { topics, topicExtractions, proposedTopics, driftItems } from '@/db/schema';
+import { topics, topicExtractions, proposedTopics } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { normalizeText, hashContent } from '@/lib/utils';
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts';
-import { computeDriftLevel } from './repair-decision';
+import { embed } from 'ai';
+import { embeddingModel } from '@/lib/llm';
 import { log } from '@/lib/logger';
 import { extractionAgent } from '@/mastra';
 
@@ -20,16 +21,19 @@ const ProposedTopicsSchema = z.object({
   ),
 });
 
+type TopicSummary = { id: string; name: string; description: string };
+
+export type ExtractTopicsResult = {
+  new: TopicSummary[];     // proposed topics pending human approval
+  drifted: TopicSummary[]; // existing topics with changed content → drift analysis
+};
+
 export async function extractTopicsStage(
   runId: string,
   sourceId: string,
   sourceVersionId: string,
   normalizedContent: string
-): Promise<{
-  affectedTopicIds: string[];
-  firstRunTopicIds: string[];
-  proposedCount: number;
-}> {
+): Promise<ExtractTopicsResult> {
   const sourceTopics = await db.select().from(topics).where(eq(topics.sourceId, sourceId));
 
   log.info('extract_topics', 'existing topics', {
@@ -37,9 +41,9 @@ export async function extractTopicsStage(
     names: sourceTopics.map((t) => t.name),
   });
 
-  const affectedTopicIds: string[] = [];
-  const firstRunTopicIds: string[] = [];
+  const drifted: TopicSummary[] = [];
 
+  // Extract content for each existing topic and queue changed ones for drift analysis
   for (const topic of sourceTopics) {
     const [previousExtraction] = await db
       .select()
@@ -55,11 +59,8 @@ export async function extractTopicsStage(
     const normalizedExtraction = normalizeText(extracted);
     const extractionHash = hashContent(normalizedExtraction);
 
-    // Skip if hash unchanged from previous extraction
     if (previousExtraction && extractionHash === previousExtraction.contentHash) {
-      log.info('extract_topics', 'topic unchanged — skipping', {
-        topic: topic.name,
-      });
+      log.info('extract_topics', 'topic unchanged', { topic: topic.name });
       continue;
     }
 
@@ -71,56 +72,80 @@ export async function extractTopicsStage(
     });
 
     if (!previousExtraction) {
-      log.info('extract_topics', 'first extraction', { topic: topic.name });
-      firstRunTopicIds.push(topic.id);
-      // Create a pending_review drift item so repair_decision pauses for human approval
-      await db.insert(driftItems).values({
-        pipelineRunId: runId,
-        topicId: topic.id,
-        changeType: 'FIRST_EXTRACTION',
-        driftScore: 0.0,
-        driftLevel: computeDriftLevel(0.0),
-        reason: 'First extraction — requires human approval before generating learning unit.',
-        status: 'pending_review',
-      });
-    } else {
-      log.info('extract_topics', 'content changed — queued for drift analysis', {
-        topic: topic.name,
-      });
-      affectedTopicIds.push(topic.id);
+      // No prior extraction to diff against — seed the record, defer to next run
+      log.info('extract_topics', 'topic seeded (no prior extraction)', { topic: topic.name });
+      continue;
     }
+
+    log.info('extract_topics', 'content changed — queued for drift analysis', { topic: topic.name });
+    drifted.push({ id: topic.id, name: topic.name, description: topic.description });
   }
 
-  log.info('extract_topics', 'calling LLM to propose new topics', {
-    existingCount: sourceTopics.length,
-  });
+  // Step 1: propose all candidate topics unconstrained
+  const proposed: TopicSummary[] = [];
 
-  // Always scan for topics not covered by existing ones (existingNames=[] means propose for all content)
-  let proposedCount = 0;
-  const existingNames = sourceTopics.map((t) => t.name);
-  const { object: proposed } = await extractionAgent.generate(
-    buildProposeTopicsPrompt(existingNames, normalizedContent),
+  log.info('extract_topics', 'proposing candidate topics', { existingCount: sourceTopics.length });
+
+  const { object: llmProposed } = await extractionAgent.generate(
+    buildProposeTopicsPrompt(normalizedContent),
     { structuredOutput: { schema: ProposedTopicsSchema } }
   );
 
-  log.info('extract_topics', 'LLM proposed topics', {
-    count: proposed.topics.length,
-    names: proposed.topics.map((p) => p.name),
+  log.info('extract_topics', 'LLM candidate topics', {
+    count: llmProposed.topics.length,
+    names: llmProposed.topics.map((p) => p.name),
   });
 
-  if (proposed.topics.length > 0) {
-    proposedCount = proposed.topics.length;
-    await db.insert(proposedTopics).values(
-      proposed.topics.map((p) => ({
-        sourceVersionId,
-        pipelineRunId: runId,
-        name: p.name,
-        description: p.description,
-        extractedContent: p.extractedContent,
-        status: 'pending_approval' as const,
-      }))
+  // Step 2: deterministic semantic dedup via embedding cosine similarity.
+  // Embed each existing topic (name + description) and each candidate, then reject
+  // any candidate whose max cosine similarity to an existing topic exceeds 0.75.
+  let toInsert = llmProposed.topics;
+
+  if (sourceTopics.length > 0 && llmProposed.topics.length > 0) {
+    const cosine = (a: number[], b: number[]) => {
+      let dot = 0, nA = 0, nB = 0;
+      for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; nA += a[i] ** 2; nB += b[i] ** 2; }
+      return dot / (Math.sqrt(nA) * Math.sqrt(nB));
+    };
+
+    const existingEmbeddings = await Promise.all(
+      sourceTopics.map((t) => embed({ model: embeddingModel, value: `${t.name}: ${t.description}` }).then((r) => r.embedding))
     );
+
+    const filtered: typeof llmProposed.topics = [];
+    for (const candidate of llmProposed.topics) {
+      const { embedding: ce } = await embed({ model: embeddingModel, value: `${candidate.name}: ${candidate.description}` });
+      const maxSim = Math.max(...existingEmbeddings.map((e) => cosine(ce, e)));
+      if (maxSim < 0.75) filtered.push(candidate);
+    }
+    toInsert = filtered;
   }
 
-  return { affectedTopicIds, firstRunTopicIds, proposedCount };
+  log.info('extract_topics', 'dedup result', {
+    candidates: llmProposed.topics.length,
+    kept: toInsert.length,
+    rejected: llmProposed.topics.map((p) => p.name).filter((n) => !toInsert.find((t) => t.name === n)),
+  });
+
+  if (toInsert.length > 0) {
+    const inserted = await db
+      .insert(proposedTopics)
+      .values(
+        toInsert.map((p) => ({
+          sourceVersionId,
+          pipelineRunId: runId,
+          name: p.name,
+          description: p.description,
+          extractedContent: p.extractedContent,
+          status: 'pending_approval' as const,
+        }))
+      )
+      .returning({ id: proposedTopics.id, name: proposedTopics.name, description: proposedTopics.description });
+
+    proposed.push(...inserted);
+  }
+
+  log.info('extract_topics', 'complete', { new: proposed.length, drifted: drifted.length });
+
+  return { new: proposed, drifted };
 }

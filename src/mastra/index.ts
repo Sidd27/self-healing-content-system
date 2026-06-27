@@ -1,4 +1,3 @@
-import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
 import { llmModel } from '@/lib/llm';
 
@@ -26,6 +25,3 @@ export const generationAgent = new Agent({
   model: llmModel,
 });
 
-export const mastra = new Mastra({
-  agents: { extractionAgent, driftAgent, generationAgent },
-});

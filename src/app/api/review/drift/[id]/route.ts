@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { driftItems, pipelineRuns } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateForTopic } from '@/pipeline/stages/generate';
-import { tryCompleteRun } from '@/lib/close-run';
+import { markGenerateRunning, tryCompleteRun } from '@/lib/close-run';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,6 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         { status: 500 }
       );
     }
+    await markGenerateRunning(item.pipelineRunId);
     await generateForTopic(item.topicId, run.sourceVersionId, item.driftScore);
     await tryCompleteRun(item.pipelineRunId);
 

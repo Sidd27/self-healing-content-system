@@ -73,15 +73,8 @@ Generate a JSON object with exactly these fields:
 All content must come only from the provided source.`;
 }
 
-export function buildProposeTopicsPrompt(existingTopicNames: string[], newContent: string): string {
-  const existingSection =
-    existingTopicNames.length > 0
-      ? `Topics already covered (do NOT re-propose these):\n${existingTopicNames.map((n) => `- ${n}`).join('\n')}`
-      : `No topics have been defined yet. You must identify all significant topics from the content.`;
-
+export function buildProposeTopicsPrompt(newContent: string): string {
   return `You are identifying learning topics from source content for a professional certification exam.
-
-${existingSection}
 
 Source content:
 ---
@@ -94,9 +87,5 @@ Each object must have:
 - description: one sentence describing what this topic covers
 - extractedContent: verbatim passages from the content relevant to this topic
 
-${
-  existingTopicNames.length === 0
-    ? 'Identify all significant topics a learner would need to know. Return at least 3 topics if the content is substantive.'
-    : 'Only include topics NOT already in the existing list. Return an empty array if nothing new is found.'
-}`;
+Identify all significant topics a learner would need to know. Return at least 3 topics if the content is substantive.`;
 }

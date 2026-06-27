@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 import type { McqQuestion } from '@/db/schema';
 
 type LearningUnit = {
@@ -17,7 +18,6 @@ type LearningUnit = {
 type QuizState = {
   step: 'lesson' | 'quiz';
   questionIndex: number;
-  // selected answer per question index, null = unanswered
   answers: (number | null)[];
 };
 
@@ -34,23 +34,18 @@ export default function TopicLearnerPage() {
         if (data.learningUnits.length > 0) {
           const u = data.learningUnits[0];
           setUnit(u);
-          setQuiz({
-            step: 'lesson',
-            questionIndex: 0,
-            answers: Array(u.questions.length).fill(null),
-          });
+          setQuiz({ step: 'lesson', questionIndex: 0, answers: Array(u.questions.length).fill(null) });
         }
         setLoaded(true);
       });
   }, [id]);
 
   if (!loaded) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  if (!unit)
-    return (
-      <p className="text-sm text-muted-foreground">
-        No content yet — run the pipeline to generate learning content.
-      </p>
-    );
+  if (!unit) return (
+    <p className="text-sm text-muted-foreground">
+      No content yet — run the pipeline to generate learning content.
+    </p>
+  );
 
   const { questions } = unit;
   const totalQuestions = questions.length;
@@ -59,26 +54,24 @@ export default function TopicLearnerPage() {
     return (
       <div className="space-y-6 max-w-2xl">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium mb-1">
-            Step 1 — Lesson
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+            Lesson
           </p>
-            <h1 className="text-2xl font-semibold">{unit.topicName}</h1>
-          <p className="text-xs text-muted-foreground mt-1" suppressHydrationWarning>
-            Content verified ·{' '}
+          <h1 className="text-2xl font-semibold tracking-tight">{unit.topicName}</h1>
+          <p className="text-xs text-muted-foreground mt-1.5" suppressHydrationWarning>
+            Verified ·{' '}
             {new Date(unit.createdAt).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
+              month: 'short', day: 'numeric', year: 'numeric',
             })}
           </p>
         </div>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm leading-relaxed">{unit.lesson}</p>
+            <p className="text-sm leading-7 text-foreground/90">{unit.lesson}</p>
           </CardContent>
         </Card>
         <Button onClick={() => setQuiz((q) => ({ ...q, step: 'quiz', questionIndex: 0 }))}>
-          Go to Questions →
+          Start quiz →
         </Button>
       </div>
     );
@@ -89,6 +82,8 @@ export default function TopicLearnerPage() {
   const selected = answers[questionIndex];
   const isAnswered = selected !== null;
   const isLast = questionIndex === totalQuestions - 1;
+  const answeredCount = answers.filter((a) => a !== null).length;
+  const progressPct = (answeredCount / totalQuestions) * 100;
 
   function selectAnswer(optionIndex: number) {
     if (isAnswered) return;
@@ -108,73 +103,76 @@ export default function TopicLearnerPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium mb-1">
-          Step 2 — Questions
-        </p>
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">{unit.topicName}</h1>
-          <span className="text-sm text-muted-foreground">
+    <div className="space-y-5 max-w-2xl">
+      {/* Header + progress */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+              Quiz
+            </p>
+            <h1 className="text-xl font-semibold tracking-tight">{unit.topicName}</h1>
+          </div>
+          <span className="text-sm tabular-nums text-muted-foreground shrink-0">
             {questionIndex + 1} / {totalQuestions}
           </span>
         </div>
+        <Progress value={progressPct} />
       </div>
 
+      {/* Question card */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-medium">{current.question}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {current.options.map((opt, i) => {
-            let variant: 'outline' | 'default' | 'destructive' = 'outline';
-            if (isAnswered) {
-              if (i === current.correctIndex) variant = 'default';
-              else if (i === selected) variant = 'destructive';
-            }
-            return (
-              <button
-                key={i}
-                onClick={() => selectAnswer(i)}
-                disabled={isAnswered}
-                className={[
-                  'w-full text-left rounded border px-4 py-2 text-sm transition-colors',
-                  !isAnswered && 'hover:bg-muted cursor-pointer',
-                  isAnswered &&
-                    i === current.correctIndex &&
-                    'bg-green-50 border-green-500 text-green-800',
-                  isAnswered &&
-                    i === selected &&
-                    i !== current.correctIndex &&
-                    'bg-red-50 border-red-400 text-red-800',
-                  isAnswered && i !== current.correctIndex && i !== selected && 'opacity-50',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                <span className="font-medium mr-2">{String.fromCharCode(65 + i)}.</span>
-                {opt}
-              </button>
-            );
-          })}
+        <CardContent className="pt-6 space-y-3">
+          <p className="text-sm font-medium leading-relaxed">{current.question}</p>
+          <div className="space-y-2 pt-1">
+            {current.options.map((opt, i) => {
+              const isCorrect = i === current.correctIndex;
+              const isSelected = i === selected;
+              return (
+                <button
+                  key={i}
+                  onClick={() => selectAnswer(i)}
+                  disabled={isAnswered}
+                  className={cn(
+                    'w-full text-left rounded-lg border px-4 py-2.5 text-sm transition-colors flex items-center gap-3',
+                    !isAnswered && 'hover:bg-muted/60 cursor-pointer',
+                    isAnswered && isCorrect && 'bg-emerald-50 border-emerald-300 text-emerald-800',
+                    isAnswered && isSelected && !isCorrect && 'bg-red-50 border-red-300 text-red-800',
+                    isAnswered && !isCorrect && !isSelected && 'opacity-40',
+                  )}
+                >
+                  <span className={cn(
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold border',
+                    !isAnswered && 'border-muted-foreground/30 text-muted-foreground',
+                    isAnswered && isCorrect && 'border-emerald-500 bg-emerald-500 text-white',
+                    isAnswered && isSelected && !isCorrect && 'border-red-400 bg-red-400 text-white',
+                    isAnswered && !isCorrect && !isSelected && 'border-muted-foreground/20',
+                  )}>
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
 
           {isAnswered && (
-            <div className="mt-4 border-l-2 border-muted-foreground/30 pl-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+            <div className="mt-4 rounded-lg bg-muted/50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
                 Rationale
               </p>
-              <p className="text-sm text-muted-foreground">{current.rationale}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{current.rationale}</p>
             </div>
           )}
         </CardContent>
       </Card>
 
       <div className="flex gap-3">
-        {isAnswered && !isLast && <Button onClick={next}>Next Step →</Button>}
+        {isAnswered && !isLast && <Button onClick={next}>Next →</Button>}
         {isAnswered && isLast && (
-          <Button onClick={restart} variant="outline">
-            Start Over
-          </Button>
+          <>
+            <Button variant="outline" onClick={restart}>Back to lesson</Button>
+          </>
         )}
       </div>
     </div>

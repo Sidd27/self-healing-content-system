@@ -25,27 +25,16 @@ const LearningUnitSchema = z.object({
   questions: z.array(McqSchema),
 });
 
-export async function generateStage(
-  runId: string,
-  sourceVersionId: string,
-  firstRunTopicIds: string[] = []
-): Promise<void> {
+export async function generateStage(runId: string, sourceVersionId: string): Promise<void> {
   const autoAppliedItems = await db
     .select()
     .from(driftItems)
     .where(and(eq(driftItems.pipelineRunId, runId), eq(driftItems.status, 'auto_applied')));
 
-  log.info('generate', 'starting', {
-    autoApplied: autoAppliedItems.length,
-    firstRun: firstRunTopicIds.length,
-  });
+  log.info('generate', 'starting', { autoApplied: autoAppliedItems.length });
 
   for (const item of autoAppliedItems) {
     await generateForTopic(item.topicId, sourceVersionId, item.driftScore);
-  }
-
-  for (const topicId of firstRunTopicIds) {
-    await generateForTopic(topicId, sourceVersionId, null);
   }
 }
 

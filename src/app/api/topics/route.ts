@@ -13,12 +13,3 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(rows);
 }
-
-export async function POST(req: Request) {
-  const body = (await req.json()) as { sourceId: string; name: string; description: string };
-  const [topic] = await db
-    .insert(topics)
-    .values({ sourceId: body.sourceId, name: body.name, description: body.description })
-    .returning();
-  return NextResponse.json(topic, { status: 201 });
-}
