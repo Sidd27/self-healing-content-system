@@ -168,10 +168,13 @@ export default function PipelineRunPage() {
     try {
       const res = await fetch(`/api/pipeline/${run.id}/resume`, { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
-      // Stay on the same page — polling will pick up the resumed run
-      setRerunning(false);
+      // Unlock the polling gate so the interval keeps firing, then do one immediate reload
+      statusRef.current = "running";
+      const refreshed = await fetch(`/api/pipeline/${run.id}`);
+      if (refreshed.ok) setRun(await refreshed.json());
     } catch (err) {
       alert(err instanceof Error ? err.message : "Resume failed");
+    } finally {
       setRerunning(false);
     }
   }

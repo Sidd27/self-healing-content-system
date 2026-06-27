@@ -16,18 +16,18 @@ export async function POST(
     return NextResponse.json({ error: `Run is ${run.status}, not failed` }, { status: 409 })
   }
 
-  // Delete the failed stage record so runPipeline can re-insert it cleanly
-  await db.delete(pipelineStages).where(
-    and(
-      eq(pipelineStages.pipelineRunId, runId),
-      eq(pipelineStages.status, 'failed')
+  // Delete the failed stage record and reset run status atomically
+  await db.transaction(async (tx) => {
+    await tx.delete(pipelineStages).where(
+      and(
+        eq(pipelineStages.pipelineRunId, runId),
+        eq(pipelineStages.status, 'failed')
+      )
     )
-  )
-
-  // Reset run status to running (clears failed + completedAt)
-  await db.update(pipelineRuns)
-    .set({ status: 'running', completedAt: null })
-    .where(eq(pipelineRuns.id, runId))
+    await tx.update(pipelineRuns)
+      .set({ status: 'running', completedAt: null })
+      .where(eq(pipelineRuns.id, runId))
+  })
 
   // Re-run in background — already-completed stages are skipped by runStage idempotency
   runPipeline(run.id, run.sourceId).catch(console.error)
