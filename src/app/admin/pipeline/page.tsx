@@ -56,7 +56,7 @@ export default function PipelineListPage() {
           {runs.map((run) => (
             <Link
               key={run.id}
-              href={`/admin/pipeline/${run.id}`}
+              href={`/admin/pipeline/${run.id}?from=pipeline`}
               className="flex items-center gap-4 px-4 py-3.5 hover:bg-muted/40 transition-colors"
             >
               <StatusDot status={run.status} />

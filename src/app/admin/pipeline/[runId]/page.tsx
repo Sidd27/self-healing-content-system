@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -411,6 +411,8 @@ function StageTimeline({
 
 export default function PipelineRunPage() {
   const { runId } = useParams<{ runId: string }>();
+  const searchParams = useSearchParams();
+  const fromPipeline = searchParams.get('from') === 'pipeline';
   const [run, setRun] = useState<RunDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
@@ -509,14 +511,20 @@ export default function PipelineRunPage() {
     <div className="space-y-6 max-w-2xl">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-        <Link href="/admin/sources" className="hover:text-foreground transition-colors">Sources</Link>
-        <ChevronRight className="h-3.5 w-3.5" />
-        {run.sourceName && (
+        {fromPipeline ? (
+          <Link href="/admin/pipeline" className="hover:text-foreground transition-colors">Pipeline</Link>
+        ) : (
           <>
-            <Link href={`/admin/sources/${run.sourceId}`} className="hover:text-foreground transition-colors">{run.sourceName}</Link>
-            <ChevronRight className="h-3.5 w-3.5" />
+            <Link href="/admin/sources" className="hover:text-foreground transition-colors">Sources</Link>
+            {run.sourceName && (
+              <>
+                <ChevronRight className="h-3.5 w-3.5" />
+                <Link href={`/admin/sources/${run.sourceId}`} className="hover:text-foreground transition-colors">{run.sourceName}</Link>
+              </>
+            )}
           </>
         )}
+        <ChevronRight className="h-3.5 w-3.5" />
         <span className="text-foreground font-medium font-mono">{run.id.slice(0, 8)}</span>
       </nav>
 
