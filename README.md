@@ -482,13 +482,6 @@ Upload a revised version of the source document and run again:
 
 ## AI Usage Record
 
-All Claude Code sessions used to build this project are in [`ai-transcripts/`](./ai-transcripts/):
-
-| File                                | Contents                                                                                    |
-| ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| `claude-code-session-2026-06-26.md` | Full session transcript (human-readable markdown — user turns, assistant turns, tool calls) |
-| `claude-code-session-raw.zip`       | Raw Claude Code JSONL files from the session, including subagent runs                       |
-
 The primary tool used was **Claude Code** (claude-sonnet-4-6) running in the terminal with Ponytail mode active (a minimal-by-default prompt mode). No other AI tools were used.
 
 ---
