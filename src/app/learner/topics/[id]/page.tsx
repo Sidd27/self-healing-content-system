@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -53,6 +55,10 @@ export default function TopicLearnerPage() {
   if (quiz.step === 'lesson') {
     return (
       <div className="space-y-6 max-w-2xl">
+        <Link href="/learner" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Topics
+        </Link>
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
             Lesson
@@ -104,6 +110,10 @@ export default function TopicLearnerPage() {
 
   return (
     <div className="space-y-5 max-w-2xl">
+      <Link href="/learner" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Topics
+      </Link>
       {/* Header + progress */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
