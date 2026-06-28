@@ -73,19 +73,32 @@ Generate a JSON object with exactly these fields:
 All content must come only from the provided source.`;
 }
 
-export function buildProposeTopicsPrompt(newContent: string): string {
-  return `You are identifying learning topics from source content for a professional certification exam.
+export function buildProposeTopicsPrompt(
+  sourceContent: string,
+  covered: { name: string; content: string }[]
+): string {
+  const coveredBlock =
+    covered.length === 0
+      ? 'None — this is the first run.'
+      : covered.map((c) => `Topic: ${c.name}\n${c.content}`).join('\n\n---\n\n');
 
-Source content:
+  return `You are identifying NEW learning topics from source content for a professional certification exam.
+
+The following topics are already covered. Do NOT propose anything that overlaps with these:
+===
+${coveredBlock}
+===
+
+Full source content:
 ---
-${newContent}
+${sourceContent}
 ---
 
-Return a JSON object with a single key "topics" whose value is an array of topic objects.
-Each object must have:
+Find content in the source that is NOT covered by any of the topics above.
+Return a JSON object with a single key "topics" whose value is an array of objects, each with:
 - name: short topic name (3-6 words)
 - description: one sentence describing what this topic covers
-- extractedContent: verbatim passages from the content relevant to this topic
+- extractedContent: verbatim passages from the source relevant to this topic
 
-Identify all significant topics a learner would need to know. Return at least 3 topics if the content is substantive.`;
+Only return genuinely new topics. If all content is already covered, return {"topics": []}.`;
 }

@@ -11,14 +11,3 @@ const provider = createOpenRouter({
 
 export const llmModel = provider(process.env.LLM_MODEL_NAME ?? 'openrouter/free');
 
-// Embedding provider — defaults to the same endpoint as LLM (works for Ollama).
-// Set EMBEDDING_BASE_URL separately when your LLM provider doesn't support embeddings
-// (e.g. OpenRouter for LLM + OpenAI directly for embeddings).
-const embeddingProvider = createOpenRouter({
-  baseURL: process.env.EMBEDDING_BASE_URL ?? process.env.OPENAI_BASE_URL,
-  apiKey: process.env.LLM_API_KEY ?? '',
-});
-
-export const embeddingModel = embeddingProvider.embedding(
-  process.env.EMBEDDING_MODEL_NAME ?? 'nomic-embed-text:latest'
-);

@@ -4,8 +4,6 @@ import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { normalizeText, hashContent } from '@/lib/utils';
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts';
-import { embed } from 'ai';
-import { embeddingModel } from '@/lib/llm';
 import { log } from '@/lib/logger';
 import { extractionAgent } from '@/mastra';
 
@@ -42,6 +40,8 @@ export async function extractTopicsStage(
   });
 
   const drifted: TopicSummary[] = [];
+  // Collect current extraction per topic to inform the proposer what's already covered
+  const coveredExtractions: { name: string; content: string }[] = [];
 
   // Extract content for each existing topic and queue changed ones for drift analysis
   for (const topic of sourceTopics) {
@@ -58,6 +58,8 @@ export async function extractTopicsStage(
 
     const normalizedExtraction = normalizeText(extracted);
     const extractionHash = hashContent(normalizedExtraction);
+
+    coveredExtractions.push({ name: topic.name, content: normalizedExtraction });
 
     if (previousExtraction && extractionHash === previousExtraction.contentHash) {
       log.info('extract_topics', 'topic unchanged', { topic: topic.name });
@@ -81,57 +83,27 @@ export async function extractTopicsStage(
     drifted.push({ id: topic.id, name: topic.name, description: topic.description });
   }
 
-  // Step 1: propose all candidate topics unconstrained
+  // Propose new topics from content not already covered by existing extractions.
+  // No embedding dedup needed — the proposer sees exactly what's already extracted.
   const proposed: TopicSummary[] = [];
 
-  log.info('extract_topics', 'proposing candidate topics', { existingCount: sourceTopics.length });
+  log.info('extract_topics', 'proposing new topics from uncovered content', { existingCount: sourceTopics.length });
 
   const { object: llmProposed } = await extractionAgent.generate(
-    buildProposeTopicsPrompt(normalizedContent),
+    buildProposeTopicsPrompt(normalizedContent, coveredExtractions),
     { structuredOutput: { schema: ProposedTopicsSchema } }
   );
 
-  log.info('extract_topics', 'LLM candidate topics', {
+  log.info('extract_topics', 'proposed new topics', {
     count: llmProposed.topics.length,
     names: llmProposed.topics.map((p) => p.name),
   });
 
-  // Step 2: deterministic semantic dedup via embedding cosine similarity.
-  // Embed each existing topic (name + description) and each candidate, then reject
-  // any candidate whose max cosine similarity to an existing topic exceeds 0.75.
-  let toInsert = llmProposed.topics;
-
-  if (sourceTopics.length > 0 && llmProposed.topics.length > 0) {
-    const cosine = (a: number[], b: number[]) => {
-      let dot = 0, nA = 0, nB = 0;
-      for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; nA += a[i] ** 2; nB += b[i] ** 2; }
-      return dot / (Math.sqrt(nA) * Math.sqrt(nB));
-    };
-
-    const existingEmbeddings = await Promise.all(
-      sourceTopics.map((t) => embed({ model: embeddingModel, value: `${t.name}: ${t.description}` }).then((r) => r.embedding))
-    );
-
-    const filtered: typeof llmProposed.topics = [];
-    for (const candidate of llmProposed.topics) {
-      const { embedding: ce } = await embed({ model: embeddingModel, value: `${candidate.name}: ${candidate.description}` });
-      const maxSim = Math.max(...existingEmbeddings.map((e) => cosine(ce, e)));
-      if (maxSim < 0.75) filtered.push(candidate);
-    }
-    toInsert = filtered;
-  }
-
-  log.info('extract_topics', 'dedup result', {
-    candidates: llmProposed.topics.length,
-    kept: toInsert.length,
-    rejected: llmProposed.topics.map((p) => p.name).filter((n) => !toInsert.find((t) => t.name === n)),
-  });
-
-  if (toInsert.length > 0) {
+  if (llmProposed.topics.length > 0) {
     const inserted = await db
       .insert(proposedTopics)
       .values(
-        toInsert.map((p) => ({
+        llmProposed.topics.map((p) => ({
           sourceVersionId,
           pipelineRunId: runId,
           name: p.name,
