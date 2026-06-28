@@ -360,6 +360,8 @@ The seeded extraction baseline is now generated using `buildExtractPrompt` (not 
 | **No auth / multi-tenancy** | All admins share the same view; all learners see all content | Add Supabase Auth with row-level security per organization |
 | **500 K character content cap** | Large documents must be split manually before ingestion | Add a chunking pre-processor that splits by section heading and indexes chunks |
 | **No generation retry UI** | A failed LLM generation during review leaves the item approved but with no learning unit — already handled server-side (item stays `pending`), but no UI affordance | Add a per-item "Retry generate" action on the pipeline run page |
+| **Topics are 1:1 with a source** | A topic belongs to exactly one source (`topics.source_id`); a concept that appears in multiple sources cannot be unified. `learning_unit_versions` similarly pins to a single `source_version_id`. A proper m2m graph (topic ↔ source, concept ↔ topic) would let the system track a concept across sources and merge drift signals | Move the topic–source relationship to a graph DB (e.g. Neo4j); keep Postgres for transactional records, graph for traversal and cross-source concept linkage |
+| **Embeddings are transient — no vector store** | Topic embeddings for cosine dedup are computed fresh on every Extract run and discarded. There is no persistent vector index, so semantic search across topics, nearest-neighbour retrieval, or cluster analysis are not possible without recomputing all embeddings at query time | Add a vector DB (pgvector on Supabase, or Pinecone/Qdrant for dedicated ANN search); persist one embedding per topic version and update on description change |
 
 ---
 
