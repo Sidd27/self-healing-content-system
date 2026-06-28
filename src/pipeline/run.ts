@@ -46,7 +46,12 @@ export async function runPipeline(runId: string, sourceId: string): Promise<void
     () => extractTopicsStage(runId, sourceId, sourceVersionId, normalized),
     {
       onResume: async () => {
-        // Reconstruct drifted list from DB: existing topics extracted this version with a prior extraction
+        // Reconstruct drifted list from DB.
+        // Under the "persist only drifted" rule, only drifted topics receive a new
+        // topicExtractions row for the current sourceVersionId — so extractedThisVersion
+        // is the discriminator: presence of a row for this version means the topic drifted.
+        // hasPriorVersion confirms it isn't a brand-new topic (new topics go through the
+        // proposal flow and are not drifted). Together they yield exactly the drifted set.
         const sourceTopics = await db.select().from(topics).where(eq(topics.sourceId, sourceId));
         const drifted: { id: string; name: string; description: string }[] = [];
         for (const topic of sourceTopics) {
