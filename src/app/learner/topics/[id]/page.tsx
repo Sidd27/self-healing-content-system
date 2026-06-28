@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -36,18 +36,23 @@ export default function TopicLearnerPage() {
         if (data.learningUnits.length > 0) {
           const u = data.learningUnits[0];
           setUnit(u);
-          setQuiz({ step: 'lesson', questionIndex: 0, answers: Array(u.questions.length).fill(null) });
+          setQuiz({
+            step: 'lesson',
+            questionIndex: 0,
+            answers: Array(u.questions.length).fill(null),
+          });
         }
         setLoaded(true);
       });
   }, [id]);
 
   if (!loaded) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  if (!unit) return (
-    <p className="text-sm text-muted-foreground">
-      No content yet — run the pipeline to generate learning content.
-    </p>
-  );
+  if (!unit)
+    return (
+      <p className="text-sm text-muted-foreground">
+        No content yet — run the pipeline to generate learning content.
+      </p>
+    );
 
   const { questions } = unit;
   const totalQuestions = questions.length;
@@ -55,24 +60,27 @@ export default function TopicLearnerPage() {
   if (quiz.step === 'lesson') {
     return (
       <div className="space-y-6 max-w-2xl">
-        <Link href="/learner" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Topics
-        </Link>
+        <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+          <Link href="/learner" className="hover:text-foreground transition-colors">Topics</Link>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="text-foreground font-medium truncate">{unit.topicName}</span>
+        </nav>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-            Lesson
-          </p>
           <h1 className="text-2xl font-semibold tracking-tight">{unit.topicName}</h1>
           <p className="text-xs text-muted-foreground mt-1.5" suppressHydrationWarning>
             Verified ·{' '}
             {new Date(unit.createdAt).toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric', year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
             })}
           </p>
         </div>
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+              Lesson
+            </p>
             <p className="text-sm leading-7 text-foreground/90">{unit.lesson}</p>
           </CardContent>
         </Card>
@@ -110,10 +118,11 @@ export default function TopicLearnerPage() {
 
   return (
     <div className="space-y-5 max-w-2xl">
-      <Link href="/learner" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Topics
-      </Link>
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/learner" className="hover:text-foreground transition-colors">Topics</Link>
+        <ChevronRight className="h-3.5 w-3.5" />
+        <span className="text-foreground font-medium truncate">{unit.topicName}</span>
+      </nav>
       {/* Header + progress */}
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
@@ -132,7 +141,7 @@ export default function TopicLearnerPage() {
 
       {/* Question card */}
       <Card>
-        <CardContent className="pt-6 space-y-3">
+        <CardContent className="pt-2 space-y-3">
           <p className="text-sm font-medium leading-relaxed">{current.question}</p>
           <div className="space-y-2 pt-1">
             {current.options.map((opt, i) => {
@@ -147,17 +156,25 @@ export default function TopicLearnerPage() {
                     'w-full text-left rounded-lg border px-4 py-2.5 text-sm transition-colors flex items-center gap-3',
                     !isAnswered && 'hover:bg-muted/60 cursor-pointer',
                     isAnswered && isCorrect && 'bg-emerald-50 border-emerald-300 text-emerald-800',
-                    isAnswered && isSelected && !isCorrect && 'bg-red-50 border-red-300 text-red-800',
-                    isAnswered && !isCorrect && !isSelected && 'opacity-40',
+                    isAnswered &&
+                      isSelected &&
+                      !isCorrect &&
+                      'bg-red-50 border-red-300 text-red-800',
+                    isAnswered && !isCorrect && !isSelected && 'opacity-40'
                   )}
                 >
-                  <span className={cn(
-                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold border',
-                    !isAnswered && 'border-muted-foreground/30 text-muted-foreground',
-                    isAnswered && isCorrect && 'border-emerald-500 bg-emerald-500 text-white',
-                    isAnswered && isSelected && !isCorrect && 'border-red-400 bg-red-400 text-white',
-                    isAnswered && !isCorrect && !isSelected && 'border-muted-foreground/20',
-                  )}>
+                  <span
+                    className={cn(
+                      'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold border',
+                      !isAnswered && 'border-muted-foreground/30 text-muted-foreground',
+                      isAnswered && isCorrect && 'border-emerald-500 bg-emerald-500 text-white',
+                      isAnswered &&
+                        isSelected &&
+                        !isCorrect &&
+                        'border-red-400 bg-red-400 text-white',
+                      isAnswered && !isCorrect && !isSelected && 'border-muted-foreground/20'
+                    )}
+                  >
                     {String.fromCharCode(65 + i)}
                   </span>
                   {opt}
@@ -181,7 +198,9 @@ export default function TopicLearnerPage() {
         {isAnswered && !isLast && <Button onClick={next}>Next →</Button>}
         {isAnswered && isLast && (
           <>
-            <Button variant="outline" onClick={restart}>Back to lesson</Button>
+            <Button variant="outline" onClick={restart}>
+              Back to lesson
+            </Button>
           </>
         )}
       </div>
