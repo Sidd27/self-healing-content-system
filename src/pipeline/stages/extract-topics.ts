@@ -63,10 +63,16 @@ export async function extractTopicsStage(
   );
 
   // One call: sort the new source against existing topics → existing[] + unmatched[]
-  const { object: extracted } = await extractionAgent.generate(
-    buildExtractPrompt(topicsWithPrior, normalizedContent),
-    { structuredOutput: { schema: ExtractSchema } }
-  );
+  // Short-circuit when there are no existing topics — the model hallucinates `existing` entries
+  // from the document's numbered sections when given an empty topic list.
+  const extracted =
+    sourceTopics.length === 0
+      ? { existing: [], unmatched: [{ content: normalizedContent }] }
+      : (
+          await extractionAgent.generate(buildExtractPrompt(topicsWithPrior, normalizedContent), {
+            structuredOutput: { schema: ExtractSchema },
+          })
+        ).object;
 
   log.info('extract_topics', 'extract result', {
     existing: extracted.existing.length,
@@ -81,8 +87,17 @@ export async function extractTopicsStage(
     });
   }
 
+  // Topics with no prior extraction have no baseline — the model can't judge drift.
+  // Force drifted: true so they always get seeded and flow through drift_analysis.
+  const noPrior = new Set(
+    topicsWithPrior.map((t, i) => (!t.priorExtraction ? i + 1 : 0)).filter(Boolean)
+  );
+  const adjustedExisting = extracted.existing.map((e) =>
+    noPrior.has(e.index) ? { ...e, drifted: true } : e
+  );
+
   // Persist a new extraction only for drifted topics; unchanged topics keep their baseline.
-  const driftedTopics = selectDriftedTopics(sourceTopics, extracted.existing);
+  const driftedTopics = selectDriftedTopics(sourceTopics, adjustedExisting);
   for (const t of driftedTopics) {
     await db.insert(topicExtractions).values({
       topicId: t.id,
