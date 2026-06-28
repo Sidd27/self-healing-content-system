@@ -12,8 +12,8 @@ export function selectDriftedTopics(
     if (!e.drifted) continue;
     if (e.index < 1 || e.index > topics.length) continue;
     if (seen.has(e.index)) continue;
-    if (!e.extractedContent || e.extractedContent.trim() === '') continue;
     seen.add(e.index);
+    if (!e.extractedContent || e.extractedContent.trim() === '') continue;
     const t = topics[e.index - 1];
     out.push({ id: t.id, name: t.name, description: t.description, extractedContent: e.extractedContent });
   }

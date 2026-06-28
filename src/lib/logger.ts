@@ -10,6 +10,14 @@ export const log = {
       console.log(prefix, msg);
     }
   },
+  warn(stage: string, msg: string, data?: Record<string, unknown>) {
+    // warnings always surface regardless of DEBUG flag
+    if (data) {
+      console.warn(`[log:${stage}] WARN: ${msg}`, data);
+    } else {
+      console.warn(`[log:${stage}] WARN: ${msg}`);
+    }
+  },
   error(stage: string, msg: string, err?: unknown) {
     // errors always surface regardless of DEBUG flag
     console.error(`[log:${stage}] ERROR: ${msg}`, err ?? '');

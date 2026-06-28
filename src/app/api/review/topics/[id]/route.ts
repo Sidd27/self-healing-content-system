@@ -45,7 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const [existingExtraction] = await db
       .select({ id: topicExtractions.id })
       .from(topicExtractions)
-      .where(eq(topicExtractions.topicId, topic.id));
+      .where(eq(topicExtractions.topicId, topic.id))
+      .limit(1);
     if (!existingExtraction) {
       await db.insert(topicExtractions).values({
         topicId: topic.id,

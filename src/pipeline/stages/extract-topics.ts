@@ -74,6 +74,13 @@ export async function extractTopicsStage(
     unmatched: extracted.unmatched.length,
   });
 
+  if (extracted.existing.length < sourceTopics.length) {
+    log.warn('extract_topics', 'LLM returned fewer existing entries than topics — some topics may be silently skipped', {
+      expected: sourceTopics.length,
+      received: extracted.existing.length,
+    });
+  }
+
   // Persist a new extraction only for drifted topics; unchanged topics keep their baseline.
   const driftedTopics = selectDriftedTopics(sourceTopics, extracted.existing);
   for (const t of driftedTopics) {

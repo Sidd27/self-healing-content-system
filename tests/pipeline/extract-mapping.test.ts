@@ -56,4 +56,12 @@ describe('selectDriftedTopics', () => {
       selectDriftedTopics(topics, [{ index: 1, extractedContent: 'x', drifted: false }])
     ).toEqual([]);
   });
+
+  it('first-empty, second-non-empty: first wins (dedup by first occurrence)', () => {
+    const result = selectDriftedTopics(topics, [
+      { index: 1, extractedContent: '', drifted: true },
+      { index: 1, extractedContent: 'second', drifted: true },
+    ]);
+    expect(result).toEqual([]);
+  });
 });
