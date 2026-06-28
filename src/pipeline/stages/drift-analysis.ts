@@ -35,6 +35,11 @@ export async function driftAnalysisStage(
       .orderBy(desc(topicExtractions.createdAt))
       .limit(2);
 
+    if (extractions.length < 2) {
+      log.info('drift_analysis', 'skipping — fewer than 2 extractions', { topic: topic.name });
+      continue;
+    }
+
     // extractions[0] = new, extractions[1] = previous
     const newContent = extractions[0].extractedContent;
     const oldContent = extractions[1].extractedContent;
@@ -43,6 +48,13 @@ export async function driftAnalysisStage(
       buildDriftPrompt(topic.name, oldContent, newContent),
       { structuredOutput: { schema: DriftAnalysisSchema } }
     );
+
+    if (object.changeType === 'NO_CHANGE') {
+      log.info('drift_analysis', 'scorer vetoed — no real change, skipping', {
+        topic: topic.name,
+      });
+      continue;
+    }
 
     const driftLevel = computeDriftLevel(object.driftScore);
     const status = computeRepairDecision(object.driftScore);
