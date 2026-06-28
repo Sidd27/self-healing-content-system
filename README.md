@@ -354,14 +354,13 @@ The seeded extraction baseline is now generated using `buildExtractPrompt` (not 
 |------------|--------|-----------------|
 | **No scheduler** | Pipeline must be triggered manually | Attach a cron scheduler; configure interval per source, topic group, or user cohort |
 | **Sequential LLM calls in Extract** | 5 topics = 5 sequential extractions; ~10 s per topic at median latency | Parallelize with `Promise.all` — straightforward refactor, held back to avoid hitting rate limits on small models |
-| **No embedding cache** | Existing topic embeddings are recomputed on every run | Cache embeddings in a `topic_embeddings` table; invalidate when topic description changes |
 | **LLM non-determinism in extraction** | Same source + same topic can yield slightly different verbatim passages → hash false positives | Accept: drift analysis is the semantic truth layer and handles low-drift false positives correctly |
 | **Single source per pipeline run** | No batch trigger across all sources | Add a `POST /api/pipeline/run-all` that fans out one run per source |
 | **No auth / multi-tenancy** | All admins share the same view; all learners see all content | Add Supabase Auth with row-level security per organization |
 | **500 K character content cap** | Large documents must be split manually before ingestion | Add a chunking pre-processor that splits by section heading and indexes chunks |
 | **No generation retry UI** | A failed LLM generation during review leaves the item approved but with no learning unit — already handled server-side (item stays `pending`), but no UI affordance | Add a per-item "Retry generate" action on the pipeline run page |
 | **Topics are scoped to one source (no m2m)** | The schema is 1:many — one source has many topics, but a topic cannot span multiple sources. If "Kubernetes Autoscaling" appears in two sources, you get two separate topic rows with no shared identity, duplicate learning units, and no cross-source drift aggregation. `learning_unit_versions` has the same constraint: it pins to a single `source_version_id`. | Model the topic–source relationship as m2m with a join table in Postgres, or move concept linkage to a graph DB (e.g. Neo4j) for richer traversal and cross-source signal merging |
-| **Embeddings are transient — no vector store** | Topic embeddings for cosine dedup are computed fresh on every Extract run and discarded. There is no persistent vector index, so semantic search across topics, nearest-neighbour retrieval, or cluster analysis are not possible without recomputing all embeddings at query time | Add a vector DB (pgvector on Supabase, or Pinecone/Qdrant for dedicated ANN search); persist one embedding per topic version and update on description change |
+| **No vector store** | Topic deduplication is handled structurally (proposer sees existing extractions so it can't re-propose covered content), but there is no persistent vector index for semantic search, nearest-neighbour retrieval, or cross-source concept clustering | Add pgvector on Supabase or a dedicated vector DB (Pinecone/Qdrant); persist one embedding per topic version for search and clustering use cases |
 
 ---
 
