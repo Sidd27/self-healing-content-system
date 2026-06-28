@@ -66,7 +66,7 @@ LLM_API_KEY=ollama
 
 ```env
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
-LLM_MODEL_NAME=meta-llama/llama-3.1-8b-instruct:free
+LLM_MODEL_NAME=openrouter/free
 LLM_API_KEY=sk-or-...
 ```
 
