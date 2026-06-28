@@ -9,5 +9,4 @@ const provider = createOpenRouter({
   apiKey: process.env.LLM_API_KEY ?? '',
 });
 
-export const llmModel = provider(process.env.LLM_MODEL_NAME ?? 'meta-llama/llama-3.3-70b-instruct:free');
-
+export const llmModel = provider(process.env.LLM_MODEL_NAME ?? 'openrouter/free');
