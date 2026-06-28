@@ -93,6 +93,7 @@ export const proposedTopics = pgTable('proposed_topics', {
   description: text('description').notNull(),
   extractedContent: text('extracted_content').notNull(),
   status: proposedTopicStatusEnum('status').notNull().default('pending_approval'),
+  generationStatus: text('generation_status'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   reviewedAt: timestamp('reviewed_at'),
 });
@@ -164,5 +165,6 @@ export const driftItems = pgTable('drift_items', {
   driftLevel: driftLevelEnum('drift_level').notNull(),
   reason: text('reason').notNull(),
   status: driftItemStatusEnum('status').notNull().default('auto_applied'),
+  generationStatus: text('generation_status'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

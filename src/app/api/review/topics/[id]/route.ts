@@ -70,17 +70,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
     }
 
+    await db.update(proposedTopics).set({ generationStatus: 'generating' }).where(eq(proposedTopics.id, id));
     await markGenerateRunning(proposed.pipelineRunId);
     try {
       await generateForTopic(topic.id, proposed.sourceVersionId, null);
     } catch (err) {
       console.error('generateForTopic failed for proposed topic', id, err);
-      return NextResponse.json({ error: 'Generation failed — topic created, retry to generate' }, { status: 500 });
+      await db.update(proposedTopics).set({ generationStatus: 'failed' }).where(eq(proposedTopics.id, id));
+      return NextResponse.json({ error: 'Generation failed — click Retry to try again' }, { status: 500 });
     }
 
     await db
       .update(proposedTopics)
-      .set({ status: 'approved', reviewedAt: new Date() })
+      .set({ status: 'approved', generationStatus: null, reviewedAt: new Date() })
       .where(eq(proposedTopics.id, id));
     await tryCompleteRun(proposed.pipelineRunId);
 

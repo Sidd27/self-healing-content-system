@@ -30,15 +30,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       );
     }
 
+    await db.update(driftItems).set({ generationStatus: 'generating' }).where(eq(driftItems.id, id));
     await markGenerateRunning(item.pipelineRunId);
     try {
       await generateForTopic(item.topicId, run.sourceVersionId, item.driftScore);
     } catch (err) {
       console.error('generateForTopic failed for drift item', id, err);
-      return NextResponse.json({ error: 'Generation failed — item left pending' }, { status: 500 });
+      await db.update(driftItems).set({ generationStatus: 'failed' }).where(eq(driftItems.id, id));
+      return NextResponse.json({ error: 'Generation failed — click Retry to try again' }, { status: 500 });
     }
 
-    await db.update(driftItems).set({ status: 'approved' }).where(eq(driftItems.id, id));
+    await db.update(driftItems).set({ status: 'approved', generationStatus: null }).where(eq(driftItems.id, id));
     await tryCompleteRun(item.pipelineRunId);
 
     return NextResponse.json({ ok: true });

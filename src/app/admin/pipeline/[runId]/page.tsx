@@ -29,11 +29,12 @@ type DriftEntry = {
     driftLevel: 'low' | 'med' | 'high';
     reason: string;
     status: string;
+    generationStatus: string | null;
   };
   topic: { id: string; name: string; description: string };
 };
 
-type ProposedTopic = { id: string; name: string; description: string; status: string };
+type ProposedTopic = { id: string; name: string; description: string; status: string; generationStatus: string | null };
 
 type RunDetail = {
   id: string;
@@ -90,11 +91,13 @@ function StageDot({ status }: { status: StageStatus }) {
   return <span className={cn(base, 'bg-border')} />;
 }
 
-function ItemDot({ status }: { status: string }) {
+function ItemDot({ status, generationStatus }: { status: string; generationStatus: string | null }) {
   const base = 'h-2 w-2 rounded-full shrink-0 mt-1.5 ring-2 ring-background';
   if (status === 'approved' || status === 'auto_applied')
     return <span className={cn(base, 'bg-emerald-400')} />;
   if (status === 'rejected') return <span className={cn(base, 'bg-muted-foreground/40')} />;
+  if (generationStatus === 'generating') return <span className={cn(base, 'bg-blue-400 animate-pulse')} />;
+  if (generationStatus === 'failed') return <span className={cn(base, 'bg-destructive')} />;
   return <span className={cn(base, 'bg-amber-400 animate-pulse')} />;
 }
 
@@ -269,13 +272,14 @@ function StageTimeline({
       {/* Per-item rows nested under Generate — drift items first, then proposed topics */}
       {driftItems.map((entry, idx) => {
         const isPending = entry.item.status === 'pending_review';
-        const busy = reviewing[entry.item.id];
+        const genStatus = entry.item.generationStatus;
+        const busy = reviewing[entry.item.id] || genStatus === 'generating';
         const isLastItem = idx === driftItems.length - 1 && proposedTopics.length === 0;
 
         return (
           <div key={entry.item.id} className="flex gap-4">
             <div className="flex flex-col items-center w-5 shrink-0">
-              <ItemDot status={entry.item.status} />
+              <ItemDot status={entry.item.status} generationStatus={genStatus} />
               {!isLastItem && <div className="w-px flex-1 mt-1 bg-border" />}
             </div>
             <div className={cn('flex-1 min-w-0', !isLastItem && 'pb-4')}>
@@ -297,7 +301,15 @@ function StageTimeline({
                     </p>
                   )}
                 </div>
-                <ItemStatusBadge status={entry.item.status} />
+                {genStatus === 'generating' ? (
+                  <Badge className="bg-blue-500/10 text-blue-700 border-blue-200 text-xs animate-pulse">
+                    Generating…
+                  </Badge>
+                ) : genStatus === 'failed' ? (
+                  <Badge variant="destructive" className="text-xs">Generation failed</Badge>
+                ) : (
+                  <ItemStatusBadge status={entry.item.status} />
+                )}
               </div>
               {isPending && (
                 <div className="flex gap-2 mt-2">
@@ -306,16 +318,18 @@ function StageTimeline({
                     disabled={busy}
                     onClick={() => onReviewDrift(entry.item.id, 'approve')}
                   >
-                    Approve
+                    {genStatus === 'generating' ? 'Generating…' : genStatus === 'failed' ? 'Retry' : 'Approve'}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => onReviewDrift(entry.item.id, 'reject')}
-                  >
-                    Reject
-                  </Button>
+                  {genStatus !== 'generating' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => onReviewDrift(entry.item.id, 'reject')}
+                    >
+                      Reject
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -325,13 +339,14 @@ function StageTimeline({
 
       {proposedTopics.map((topic, idx) => {
         const isPending = topic.status === 'pending_approval';
-        const busy = reviewing[topic.id];
+        const genStatus = topic.generationStatus;
+        const busy = reviewing[topic.id] || genStatus === 'generating';
         const isLastItem = idx === proposedTopics.length - 1;
 
         return (
           <div key={topic.id} className="flex gap-4">
             <div className="flex flex-col items-center w-5 shrink-0">
-              <ItemDot status={topic.status} />
+              <ItemDot status={topic.status} generationStatus={genStatus} />
               {!isLastItem && <div className="w-px flex-1 mt-1 bg-border" />}
             </div>
             <div className={cn('flex-1 min-w-0', !isLastItem && 'pb-4')}>
@@ -352,7 +367,15 @@ function StageTimeline({
                     </p>
                   )}
                 </div>
-                <ItemStatusBadge status={topic.status} />
+                {genStatus === 'generating' ? (
+                  <Badge className="bg-blue-500/10 text-blue-700 border-blue-200 text-xs animate-pulse">
+                    Generating…
+                  </Badge>
+                ) : genStatus === 'failed' ? (
+                  <Badge variant="destructive" className="text-xs">Generation failed</Badge>
+                ) : (
+                  <ItemStatusBadge status={topic.status} />
+                )}
               </div>
               {isPending && (
                 <div className="flex gap-2 mt-2">
@@ -361,16 +384,18 @@ function StageTimeline({
                     disabled={busy}
                     onClick={() => onReviewTopic(topic.id, 'approve')}
                   >
-                    Approve
+                    {genStatus === 'generating' ? 'Generating…' : genStatus === 'failed' ? 'Retry' : 'Approve'}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => onReviewTopic(topic.id, 'reject')}
-                  >
-                    Reject
-                  </Button>
+                  {genStatus !== 'generating' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => onReviewTopic(topic.id, 'reject')}
+                    >
+                      Reject
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
