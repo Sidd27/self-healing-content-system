@@ -4,11 +4,21 @@ import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { normalizeText } from '@/lib/utils';
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts';
+import { selectDriftedTopics } from '@/pipeline/extract-mapping';
 import { log } from '@/lib/logger';
 import { extractionAgent } from '@/mastra';
 
-// Wrapped in an object — bare z.array at the top level causes silent empty
-// responses from smaller models with structured output
+const ExtractSchema = z.object({
+  existing: z.array(
+    z.object({
+      index: z.number().int(),
+      extractedContent: z.string(),
+      drifted: z.boolean(),
+    })
+  ),
+  unmatched: z.array(z.object({ content: z.string() })),
+});
+
 const ProposedTopicsSchema = z.object({
   topics: z.array(
     z.object({
@@ -22,8 +32,8 @@ const ProposedTopicsSchema = z.object({
 type TopicSummary = { id: string; name: string; description: string };
 
 export type ExtractTopicsResult = {
-  new: TopicSummary[];     // proposed topics pending human approval
-  drifted: TopicSummary[]; // existing topics with changed content → drift analysis
+  new: TopicSummary[];
+  drifted: TopicSummary[];
 };
 
 export async function extractTopicsStage(
@@ -39,80 +49,81 @@ export async function extractTopicsStage(
     names: sourceTopics.map((t) => t.name),
   });
 
-  const drifted: TopicSummary[] = [];
-  // Collect current extraction per topic to inform the proposer what's already covered
-  const coveredExtractions: { name: string; content: string }[] = [];
-
-  // Extract content for each existing topic and queue changed ones for drift analysis
-  for (const topic of sourceTopics) {
-    const [previousExtraction] = await db
-      .select()
-      .from(topicExtractions)
-      .where(eq(topicExtractions.topicId, topic.id))
-      .orderBy(desc(topicExtractions.createdAt))
-      .limit(1);
-
-    const { text: extracted } = await extractionAgent.generate(
-      buildExtractPrompt(topic.name, topic.description, normalizedContent)
-    );
-
-    const normalizedExtraction = normalizeText(extracted);
-
-    coveredExtractions.push({ name: topic.name, content: normalizedExtraction });
-
-    if (previousExtraction && previousExtraction.extractedContent === normalizedExtraction) {
-      log.info('extract_topics', 'topic unchanged', { topic: topic.name });
-      continue;
-    }
-
-    await db.insert(topicExtractions).values({
-      topicId: topic.id,
-      sourceVersionId,
-      extractedContent: normalizedExtraction,
-    });
-
-    if (!previousExtraction) {
-      // No prior extraction to diff against — seed the record, defer to next run
-      log.info('extract_topics', 'topic seeded (no prior extraction)', { topic: topic.name });
-      continue;
-    }
-
-    log.info('extract_topics', 'content changed — queued for drift analysis', { topic: topic.name });
-    drifted.push({ id: topic.id, name: topic.name, description: topic.description });
-  }
-
-  // Propose new topics from content not already covered by existing extractions.
-  // No embedding dedup needed — the proposer sees exactly what's already extracted.
-  const proposed: TopicSummary[] = [];
-
-  log.info('extract_topics', 'proposing new topics from uncovered content', { existingCount: sourceTopics.length });
-
-  const { object: llmProposed } = await extractionAgent.generate(
-    buildProposeTopicsPrompt(normalizedContent, coveredExtractions),
-    { structuredOutput: { schema: ProposedTopicsSchema } }
+  // Load each topic's latest prior extraction — the baseline the model needs to judge drift.
+  const topicsWithPrior = await Promise.all(
+    sourceTopics.map(async (t) => {
+      const [prior] = await db
+        .select({ extractedContent: topicExtractions.extractedContent })
+        .from(topicExtractions)
+        .where(eq(topicExtractions.topicId, t.id))
+        .orderBy(desc(topicExtractions.createdAt))
+        .limit(1);
+      return { name: t.name, description: t.description, priorExtraction: prior?.extractedContent ?? '' };
+    })
   );
 
-  log.info('extract_topics', 'proposed new topics', {
-    count: llmProposed.topics.length,
-    names: llmProposed.topics.map((p) => p.name),
+  // One call: sort the new source against existing topics → existing[] + unmatched[]
+  const { object: extracted } = await extractionAgent.generate(
+    buildExtractPrompt(topicsWithPrior, normalizedContent),
+    { structuredOutput: { schema: ExtractSchema } }
+  );
+
+  log.info('extract_topics', 'extract result', {
+    existing: extracted.existing.length,
+    drifted: extracted.existing.filter((e) => e.drifted).length,
+    unmatched: extracted.unmatched.length,
   });
 
-  if (llmProposed.topics.length > 0) {
-    const inserted = await db
-      .insert(proposedTopics)
-      .values(
-        llmProposed.topics.map((p) => ({
-          sourceVersionId,
-          pipelineRunId: runId,
-          name: p.name,
-          description: p.description,
-          extractedContent: p.extractedContent,
-          status: 'pending_approval' as const,
-        }))
-      )
-      .returning({ id: proposedTopics.id, name: proposedTopics.name, description: proposedTopics.description });
+  // Persist a new extraction only for drifted topics; unchanged topics keep their baseline.
+  const driftedTopics = selectDriftedTopics(sourceTopics, extracted.existing);
+  for (const t of driftedTopics) {
+    await db.insert(topicExtractions).values({
+      topicId: t.id,
+      sourceVersionId,
+      extractedContent: normalizeText(t.extractedContent),
+    });
+  }
+  const drifted: TopicSummary[] = driftedTopics.map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+  }));
 
-    proposed.push(...inserted);
+  // Name unmatched content into proposed new topics (one call, only if any).
+  const proposed: TopicSummary[] = [];
+  const unmatched = extracted.unmatched.map((u) => u.content).filter((c) => c.trim() !== '');
+
+  if (unmatched.length > 0) {
+    const { object: llmProposed } = await extractionAgent.generate(
+      buildProposeTopicsPrompt(unmatched),
+      { structuredOutput: { schema: ProposedTopicsSchema } }
+    );
+
+    log.info('extract_topics', 'proposed new topics', {
+      count: llmProposed.topics.length,
+      names: llmProposed.topics.map((p) => p.name),
+    });
+
+    if (llmProposed.topics.length > 0) {
+      const inserted = await db
+        .insert(proposedTopics)
+        .values(
+          llmProposed.topics.map((p) => ({
+            sourceVersionId,
+            pipelineRunId: runId,
+            name: p.name,
+            description: p.description,
+            extractedContent: p.extractedContent,
+            status: 'pending_approval' as const,
+          }))
+        )
+        .returning({
+          id: proposedTopics.id,
+          name: proposedTopics.name,
+          description: proposedTopics.description,
+        });
+      proposed.push(...inserted);
+    }
   }
 
   log.info('extract_topics', 'complete', { new: proposed.length, drifted: drifted.length });
