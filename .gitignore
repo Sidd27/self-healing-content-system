@@ -42,3 +42,4 @@ next-env.d.ts
 
 # generated seed data
 /scripts/seed-data/
+ai-transcripts/
