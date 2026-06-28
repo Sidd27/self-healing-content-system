@@ -67,17 +67,15 @@ export default function SourcesPage() {
       });
       const source = await res.json() as Source;
 
-      if (form.type === 'pdf') {
-        setStep(pdfFile ? 'uploading' : 'triggering');
-        const body = pdfFile
-          ? (() => { const fd = new FormData(); fd.append('file', pdfFile); return fd; })()
-          : undefined;
-        const runRes = await fetch(`/api/sources/${source.id}/pipeline`, { method: 'POST', body });
-        if (runRes.ok) {
-          const { runId } = await runRes.json() as { runId: string };
-          router.push(`/admin/pipeline/${runId}`);
-          return; // dialog unmounts with the navigation
-        }
+      setStep(form.type === 'pdf' && pdfFile ? 'uploading' : 'triggering');
+      const body = pdfFile
+        ? (() => { const fd = new FormData(); fd.append('file', pdfFile); return fd; })()
+        : undefined;
+      const runRes = await fetch(`/api/sources/${source.id}/pipeline`, { method: 'POST', body });
+      if (runRes.ok) {
+        const { runId } = await runRes.json() as { runId: string };
+        router.push(`/admin/pipeline/${runId}`);
+        return; // dialog unmounts with the navigation
       }
 
       setOpen(false);
@@ -173,13 +171,13 @@ export default function SourcesPage() {
                   </div>
                 </>
               )}
-              <Button type="submit" className="w-full" disabled={submitting || (form.type === 'pdf' && !pdfFile && !form.url)}>
+              <Button type="submit" className="w-full" disabled={submitting || (form.type === 'html' && !form.url) || (form.type === 'pdf' && !pdfFile && !form.url)}>
                 {submitting
                   ? step === 'creating' ? 'Creating source…'
                     : step === 'uploading' ? 'Uploading PDF…'
                     : step === 'triggering' ? 'Starting pipeline…'
                     : 'Working…'
-                  : form.type === 'pdf' ? 'Create & run pipeline' : 'Create source'}
+                  : 'Create & run pipeline'}
               </Button>
             </form>
           </DialogContent>
