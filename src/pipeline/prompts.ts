@@ -1,24 +1,44 @@
 export function buildExtractPrompt(
-  topicName: string,
-  description: string,
-  sourceContent: string
+  topics: { name: string; description: string; priorExtraction: string }[],
+  newSource: string
 ): string {
-  return `You are extracting verbatim content from a source document.
+  const topicList = topics
+    .map(
+      (t, i) =>
+        `${i + 1}. ${t.name} — ${t.description}\n   Prior version content:\n   ${
+          t.priorExtraction.trim() || '[no prior version]'
+        }`
+    )
+    .join('\n\n');
 
-Topic: "${topicName}"
-Topic description: "${description}"
+  return `You are analyzing a source document against a set of known learning topics.
 
-Source document:
+Known topics (referenced by number), each with its prior version content:
+${topicList}
+
+New source document:
 ---
-${sourceContent}
+${newSource}
 ---
 
-Extract ALL passages from the source that are directly relevant to this topic.
-Copy the text VERBATIM — do not paraphrase, summarize, reorder, or add any words.
-If a passage is relevant, copy it exactly as it appears.
-If nothing in the source is relevant to this topic, return an empty string.
+Do two things:
 
-Return only the extracted passages, nothing else.`;
+1) For EACH known topic above, extract the passages from the NEW source relevant
+   to it, VERBATIM (copy exactly — do not paraphrase). Set "drifted": true if the
+   topic's content in the new source meaningfully differs from its prior version
+   content shown above; set "drifted": false if it is essentially the same.
+
+2) Identify any substantive content in the new source that does NOT belong to any
+   of the known topics above. Return each such passage as an "unmatched" item.
+
+Return a JSON object:
+{
+  "existing": [{ "index": <topic number>, "extractedContent": "<verbatim>", "drifted": <bool> }],
+  "unmatched": [{ "content": "<verbatim passage not covered by any known topic>" }]
+}
+
+Include one "existing" entry per known topic, using its number as "index".
+If nothing in the source is unmatched, return "unmatched": [].`;
 }
 
 export function buildDriftPrompt(
@@ -73,32 +93,24 @@ Generate a JSON object with exactly these fields:
 All content must come only from the provided source.`;
 }
 
-export function buildProposeTopicsPrompt(
-  sourceContent: string,
-  covered: { name: string; content: string }[]
-): string {
-  const coveredBlock =
-    covered.length === 0
-      ? 'None — this is the first run.'
-      : covered.map((c) => `Topic: ${c.name}\n${c.content}`).join('\n\n---\n\n');
+export function buildProposeTopicsPrompt(unmatched: string[]): string {
+  const blocks = unmatched.map((c, i) => `Passage ${i + 1}:\n${c}`).join('\n\n---\n\n');
 
-  return `You are identifying NEW learning topics from source content for a professional certification exam.
+  return `The following passages were found in a source document and do NOT belong
+to any existing learning topic. Structure them into new learning topics for a
+professional certification exam.
 
-The following topics are already covered. Do NOT propose anything that overlaps with these:
+Unmatched passages:
 ===
-${coveredBlock}
+${blocks}
 ===
 
-Full source content:
----
-${sourceContent}
----
-
-Find content in the source that is NOT covered by any of the topics above.
-Return a JSON object with a single key "topics" whose value is an array of objects, each with:
+Return a JSON object with a single key "topics" whose value is an array of objects,
+each with:
 - name: short topic name (3-6 words)
 - description: one sentence describing what this topic covers
-- extractedContent: verbatim passages from the source relevant to this topic
+- extractedContent: the verbatim passage(s) relevant to this topic
 
-Only return genuinely new topics. If all content is already covered, return {"topics": []}.`;
+Merge passages that describe the same concept into one topic. Drop any passage too
+thin to be a real topic. If none qualify, return {"topics": []}.`;
 }
