@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const OUT = path.join(__dirname, 'seed-data');
+fs.mkdirSync(OUT, { recursive: true });
 
 function writePdf(filename: string, sections: { title: string; body: string }[], subtitle: string) {
   const doc = new PDFDocument({ margin: 60 });
