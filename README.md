@@ -6,6 +6,19 @@ An AI-powered pipeline that keeps learning content accurate as source materials 
 
 ---
 
+## AI Usage Record
+
+All Claude Code sessions used to build this project are in [`ai-transcripts/`](./ai-transcripts/):
+
+| File | Contents |
+|------|----------|
+| `claude-code-session-2026-06-26.md` | Full session transcript (human-readable markdown — user turns, assistant turns, tool calls) |
+| `claude-code-session-raw.zip` | Raw Claude Code JSONL files from the session, including subagent runs |
+
+The primary tool used was **Claude Code** (claude-sonnet-4-6) running in the terminal with Ponytail mode active (a minimal-by-default prompt mode). No other AI tools were used.
+
+---
+
 ## Goal
 
 Learning content built on top of a source document (exam guide, technical spec, policy doc) drifts out of accuracy as the underlying source changes. The conventional response is a manual content audit — slow, expensive, and easy to miss. This system makes content maintenance continuous and automatic:
@@ -29,7 +42,7 @@ Learning content built on top of a source document (exam guide, technical spec, 
 ### 1. Clone and install
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Sidd27/self-healing-content-system
 cd self-healing-content-system
 npm install
 ```
