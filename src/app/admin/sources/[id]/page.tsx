@@ -98,7 +98,9 @@ export default function SourceDetailPage() {
     <div className="space-y-6 max-w-2xl">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-        <Link href="/admin/sources" className="hover:text-foreground transition-colors">Sources</Link>
+        <Link href="/admin/sources" className="hover:text-foreground transition-colors">
+          Sources
+        </Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <span className="text-foreground font-medium truncate">{source.name}</span>
       </nav>
@@ -223,12 +225,16 @@ export default function SourceDetailPage() {
               {source.runs.map((r) => (
                 <div
                   key={r.id}
-                  className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 hover:opacity-80 transition-opacity cursor-pointer"
+                  className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0"
                 >
-                  <Link href={`/admin/pipeline/${r.id}`}>
+                  <Link
+                    className="flex items-center cursor-pointer hover:opacity-80 transition-opacity gap-1"
+                    href={`/admin/pipeline/${r.id}`}
+                  >
                     <span className="text-xs text-muted-foreground font-mono">
                       {r.id.slice(0, 8)}
                     </span>
+                    <ChevronRight className="h-3.5 w-3.5" />
                   </Link>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-muted-foreground" suppressHydrationWarning>
