@@ -4,7 +4,11 @@ export const log = {
   info(stage: string, msg: string, data?: Record<string, unknown>) {
     if (!DEBUG) return;
     const prefix = `[log:${stage}]`;
-    data ? console.log(prefix, msg, data) : console.log(prefix, msg);
+    if (data) {
+      console.log(prefix, msg, data);
+    } else {
+      console.log(prefix, msg);
+    }
   },
   error(stage: string, msg: string, err?: unknown) {
     // errors always surface regardless of DEBUG flag

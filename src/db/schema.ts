@@ -77,7 +77,6 @@ export const topicExtractions = pgTable('topic_extractions', {
     .notNull()
     .references(() => sourceVersions.id),
   extractedContent: text('extracted_content').notNull(),
-  contentHash: text('content_hash').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

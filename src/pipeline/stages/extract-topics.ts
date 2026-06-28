@@ -2,7 +2,7 @@ import { db } from '@/db';
 import { topics, topicExtractions, proposedTopics } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { normalizeText, hashContent } from '@/lib/utils';
+import { normalizeText } from '@/lib/utils';
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts';
 import { log } from '@/lib/logger';
 import { extractionAgent } from '@/mastra';
@@ -57,11 +57,10 @@ export async function extractTopicsStage(
     );
 
     const normalizedExtraction = normalizeText(extracted);
-    const extractionHash = hashContent(normalizedExtraction);
 
     coveredExtractions.push({ name: topic.name, content: normalizedExtraction });
 
-    if (previousExtraction && extractionHash === previousExtraction.contentHash) {
+    if (previousExtraction && previousExtraction.extractedContent === normalizedExtraction) {
       log.info('extract_topics', 'topic unchanged', { topic: topic.name });
       continue;
     }
@@ -70,7 +69,6 @@ export async function extractTopicsStage(
       topicId: topic.id,
       sourceVersionId,
       extractedContent: normalizedExtraction,
-      contentHash: extractionHash,
     });
 
     if (!previousExtraction) {

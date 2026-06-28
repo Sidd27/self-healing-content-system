@@ -13,7 +13,7 @@
 - LLM calls go through Mastra agents in `src/mastra/index.ts` (`extractionAgent`, `driftAgent`, `generationAgent`). Never call `createOpenRouter()` directly.
 - Top-level Zod schemas for structured output must be an **object wrapping** any array (bare top-level `z.array` causes silent empty responses on small models).
 - Append-only tables: never DELETE from `source_versions`, `topic_extractions`, or `learning_unit_versions`.
-- `topicExtractions.contentHash` is `NOT NULL` — always populate it (provenance), even though it is no longer compared.
+- The `topicExtractions.contentHash` column has been dropped (migration `0002`). Do not reintroduce it — never write or read it. `sourceVersions.contentHash` (whole-source gate) stays.
 - Drift threshold unchanged: `driftScore < 0.75` → `auto_applied`, `>= 0.75` → `pending_review`.
 - The model must never be asked to echo a topic UUID. Topics are identified to the LLM by a 1-based positional `index`; code maps index→topicId.
 - Run `npx tsc --noEmit` and `npm run lint` clean before each commit.
@@ -276,7 +276,7 @@ Use one extraction call (returning `existing` + `unmatched`), persist new extrac
 - Modify: `src/pipeline/stages/extract-topics.ts`
 
 **Interfaces:**
-- Consumes: `selectDriftedTopics` (Task 1), `buildExtractPrompt`/`buildProposeTopicsPrompt` (Task 2), `extractionAgent`, `db`, `hashContent`, `normalizeText`.
+- Consumes: `selectDriftedTopics` (Task 1), `buildExtractPrompt`/`buildProposeTopicsPrompt` (Task 2), `extractionAgent`, `db`, `normalizeText`.
 - Produces: unchanged signature — `extractTopicsStage(runId, sourceId, sourceVersionId, normalizedContent): Promise<{ new: TopicSummary[]; drifted: TopicSummary[] }>`.
 
 - [ ] **Step 1: Replace the file body**
@@ -288,7 +288,7 @@ import { db } from '@/db';
 import { topics, topicExtractions, proposedTopics } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
-import { normalizeText, hashContent } from '@/lib/utils';
+import { normalizeText } from '@/lib/utils';
 import { buildExtractPrompt, buildProposeTopicsPrompt } from '@/pipeline/prompts';
 import { selectDriftedTopics } from '@/pipeline/extract-mapping';
 import { log } from '@/lib/logger';
@@ -363,12 +363,10 @@ export async function extractTopicsStage(
   // Persist a new extraction only for drifted topics; unchanged topics keep their baseline.
   const driftedTopics = selectDriftedTopics(sourceTopics, extracted.existing);
   for (const t of driftedTopics) {
-    const normalized = normalizeText(t.extractedContent);
     await db.insert(topicExtractions).values({
       topicId: t.id,
       sourceVersionId,
-      extractedContent: normalized,
-      contentHash: hashContent(normalized),
+      extractedContent: normalizeText(t.extractedContent),
     });
   }
   const drifted: TopicSummary[] = driftedTopics.map((t) => ({
@@ -509,7 +507,7 @@ On proposed-topic approval, seed the first extraction directly from `proposedTop
 - Modify: `src/app/api/review/topics/[id]/route.ts`
 
 **Interfaces:**
-- Consumes: `proposedTopics.extractedContent`, `hashContent`, `normalizeText`, `db`.
+- Consumes: `proposedTopics.extractedContent`, `normalizeText`, `db`.
 - Produces: unchanged route behaviour (idempotent topic create → seed extraction → generate → approve).
 
 - [ ] **Step 1: Remove the re-extraction imports**
@@ -533,12 +531,10 @@ Replace the seed block — the part that loads `version`, calls `extractionAgent
       .from(topicExtractions)
       .where(eq(topicExtractions.topicId, topic.id));
     if (!existingExtraction) {
-      const normalized = normalizeText(proposed.extractedContent);
       await db.insert(topicExtractions).values({
         topicId: topic.id,
         sourceVersionId: proposed.sourceVersionId,
-        extractedContent: normalized,
-        contentHash: hashContent(normalized),
+        extractedContent: normalizeText(proposed.extractedContent),
       });
     }
 ```
@@ -606,6 +602,6 @@ git commit -m "chore: verify extract_topics resume path under persist-only-drift
 ## Notes for the implementer
 
 - Do not change stage names, the `stageNameEnum`, or any DB column — this rework is code-only, no migration.
-- Keep populating `topicExtractions.contentHash` (NOT NULL); it is provenance only now.
+- `topicExtractions.contentHash` is gone (migration `0002`) — never write or read it.
 - The `run.ts` orchestrator already gates `drift_analysis` on `drifted.length > 0` and routes proposals to human review via `repair_decision` — those do not change.
 - There is no integration test harness for LLM/DB stages; correctness for those stages is carried by `tsc`, lint, the pure-function tests, and the existing documented-behaviour tests. Do not invent a DB/LLM mock harness for this plan.

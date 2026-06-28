@@ -1,0 +1,1 @@
+ALTER TABLE "topic_extractions" DROP COLUMN "content_hash";

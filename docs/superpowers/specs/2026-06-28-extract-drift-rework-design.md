@@ -111,9 +111,10 @@ Two distinct gates, two distinct jobs:
 
 ## Cleanups (deletions)
 
-- **Per-topic hash comparison** — removed. The `topicExtractions.contentHash`
-  column stays and is still populated for provenance; it is simply no longer
-  compared. No migration.
+- **Per-topic hash comparison** — removed, and the `topicExtractions.contentHash`
+  column is **dropped** (migration `0002`). It was only ever used for the
+  comparison, which is gone. `sourceVersions.contentHash` (the whole-source gate)
+  stays.
 - **`buildExtractPrompt`** (the single-topic verbatim extractor) — removed. On
   proposed-topic approval, seed the topic's first extraction **directly from
   `proposedTopics.extractedContent`** — the exact text the human reviewed and

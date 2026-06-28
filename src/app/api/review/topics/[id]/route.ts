@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { proposedTopics, topics, pipelineRuns, topicExtractions, sourceVersions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { generateForTopic } from '@/pipeline/stages/generate';
-import { normalizeText, hashContent } from '@/lib/utils';
+import { normalizeText } from '@/lib/utils';
 import { markGenerateRunning, tryCompleteRun } from '@/lib/close-run';
 import { extractionAgent } from '@/mastra';
 import { buildExtractPrompt } from '@/pipeline/prompts';
@@ -66,7 +66,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         topicId: topic.id,
         sourceVersionId: proposed.sourceVersionId,
         extractedContent: normalized,
-        contentHash: hashContent(normalized),
       });
     }
 
