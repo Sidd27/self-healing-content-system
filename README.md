@@ -6,19 +6,6 @@ An AI-powered pipeline that keeps learning content accurate as source materials 
 
 ---
 
-## AI Usage Record
-
-All Claude Code sessions used to build this project are in [`ai-transcripts/`](./ai-transcripts/):
-
-| File | Contents |
-|------|----------|
-| `claude-code-session-2026-06-26.md` | Full session transcript (human-readable markdown — user turns, assistant turns, tool calls) |
-| `claude-code-session-raw.zip` | Raw Claude Code JSONL files from the session, including subagent runs |
-
-The primary tool used was **Claude Code** (claude-sonnet-4-6) running in the terminal with Ponytail mode active (a minimal-by-default prompt mode). No other AI tools were used.
-
----
-
 ## Goal
 
 Learning content built on top of a source document (exam guide, technical spec, policy doc) drifts out of accuracy as the underlying source changes. The conventional response is a manual content audit — slow, expensive, and easy to miss. This system makes content maintenance continuous and automatic:
@@ -53,15 +40,15 @@ npm install
 cp .env.local.example .env.local
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | Supabase → Settings → Database → **Transaction pooler** URL, port **6543** |
-| `SUPABASE_URL` | Supabase → Settings → API → Project URL |
-| `SUPABASE_SECRET_KEY` | Supabase → Settings → API → `service_role` secret |
-| `OPENAI_BASE_URL` | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1` |
-| `LLM_MODEL_NAME` | e.g. `llama3:8b` or `qwen3.5:latest` |
-| `LLM_API_KEY` | `ollama` (local) or your OpenRouter key |
-| `DEBUG_LOGS` | `true` to enable verbose pipeline logs |
+| Variable              | Description                                                                |
+| --------------------- | -------------------------------------------------------------------------- |
+| `DATABASE_URL`        | Supabase → Settings → Database → **Transaction pooler** URL, port **6543** |
+| `SUPABASE_URL`        | Supabase → Settings → API → Project URL                                    |
+| `SUPABASE_SECRET_KEY` | Supabase → Settings → API → `service_role` secret                          |
+| `OPENAI_BASE_URL`     | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1`     |
+| `LLM_MODEL_NAME`      | e.g. `llama3:8b` or `qwen3.5:latest`                                       |
+| `LLM_API_KEY`         | `ollama` (local) or your OpenRouter key                                    |
+| `DEBUG_LOGS`          | `true` to enable verbose pipeline logs                                     |
 
 #### Local (Ollama)
 
@@ -248,6 +235,7 @@ This means a crashed or timed-out pipeline can be re-triggered and will skip alr
 Fetches the source document, normalizes whitespace and casing, computes an MD5 hash, and compares against the latest stored version.
 
 **Stop conditions:**
+
 - Hash matches latest version **and** a prior run for that version completed or is awaiting review → mark run complete, exit. No downstream processing.
 - Hash matches but the prior run failed → reuse the existing source version, continue downstream (retry scenario).
 
@@ -281,6 +269,7 @@ If `unmatched` is non-empty, one more call structures the leftover content into 
 ### 3 — Drift Analysis
 
 For each topic that the extraction flagged as `drifted: true`, the drift LLM compares old vs new extracted content and returns:
+
 - `changeType`: `NO_CHANGE | MINOR_EDIT | SEMANTIC_CHANGE | MAJOR_RESTRUCTURE | CONTENT_REMOVED`
 - `driftScore`: 0.0–1.0
 - `reason`: one-sentence explanation
@@ -293,10 +282,10 @@ Results are stored as `drift_items` per topic.
 
 Routes each drift item based on score threshold (`DRIFT_HIGH_THRESHOLD = 0.75`):
 
-| Score | Level | Status | Action |
-|-------|-------|--------|--------|
-| 0.00–0.74 | low / med | `auto_applied` | Generate immediately |
-| 0.75–1.00 | high | `pending_review` | Queue for human decision |
+| Score     | Level     | Status           | Action                   |
+| --------- | --------- | ---------------- | ------------------------ |
+| 0.00–0.74 | low / med | `auto_applied`   | Generate immediately     |
+| 0.75–1.00 | high      | `pending_review` | Queue for human decision |
 
 If any items are `pending_review` **or** any proposed topics are `pending_approval`, the run transitions to `awaiting_review` and pauses before Generate.
 
@@ -371,15 +360,15 @@ Run completion uses a transaction with `SELECT FOR UPDATE` on the pipeline run r
 
 ## Current Limitations
 
-| Limitation | Impact | Production path |
-|------------|--------|-----------------|
-| **No scheduler** | Pipeline must be triggered manually | Attach a cron scheduler; configure interval per source, topic group, or user cohort |
-| **Single extract call grows with topic count** | All existing topics + full source in one prompt; fine at 3–8 topics but gets expensive at scale | Chunk the extraction call by batches of topics, or add a retrieval pre-filter to only send relevant topics |
-| **Single source per pipeline run** | No batch trigger across all sources | Add a `POST /api/pipeline/run-all` that fans out one run per source |
-| **No auth / multi-tenancy** | All admins share the same view; all learners see all content | Add Supabase Auth with row-level security per organization |
-| **500 K character content cap** | Large documents must be split manually before ingestion | Add a chunking pre-processor that splits by section heading and indexes chunks |
-| **Topics are scoped to one source (no m2m)** | The schema is 1:many — one source has many topics, but a topic cannot span multiple sources. If "Kubernetes Autoscaling" appears in two sources, you get two separate topic rows with no shared identity, duplicate learning units, and no cross-source drift aggregation. `learning_unit_versions` has the same constraint: it pins to a single `source_version_id`. | Model the topic–source relationship as m2m with a join table in Postgres, or move concept linkage to a graph DB (e.g. Neo4j) for richer traversal and cross-source signal merging |
-| **No vector store** | Topic deduplication is handled structurally (the extraction call partitions content into matched and unmatched, so the naming call can't re-propose already-covered content), but there is no persistent vector index for semantic search, nearest-neighbour retrieval, or cross-source concept clustering | Add pgvector on Supabase or a dedicated vector DB (Pinecone/Qdrant); persist one embedding per topic version for search and clustering use cases |
+| Limitation                                     | Impact                                                                                                                                                                                                                                                                                                                                                                | Production path                                                                                                                                                                   |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **No scheduler**                               | Pipeline must be triggered manually                                                                                                                                                                                                                                                                                                                                   | Attach a cron scheduler; configure interval per source, topic group, or user cohort                                                                                               |
+| **Single extract call grows with topic count** | All existing topics + full source in one prompt; fine at 3–8 topics but gets expensive at scale                                                                                                                                                                                                                                                                       | Chunk the extraction call by batches of topics, or add a retrieval pre-filter to only send relevant topics                                                                        |
+| **Single source per pipeline run**             | No batch trigger across all sources                                                                                                                                                                                                                                                                                                                                   | Add a `POST /api/pipeline/run-all` that fans out one run per source                                                                                                               |
+| **No auth / multi-tenancy**                    | All admins share the same view; all learners see all content                                                                                                                                                                                                                                                                                                          | Add Supabase Auth with row-level security per organization                                                                                                                        |
+| **500 K character content cap**                | Large documents must be split manually before ingestion                                                                                                                                                                                                                                                                                                               | Add a chunking pre-processor that splits by section heading and indexes chunks                                                                                                    |
+| **Topics are scoped to one source (no m2m)**   | The schema is 1:many — one source has many topics, but a topic cannot span multiple sources. If "Kubernetes Autoscaling" appears in two sources, you get two separate topic rows with no shared identity, duplicate learning units, and no cross-source drift aggregation. `learning_unit_versions` has the same constraint: it pins to a single `source_version_id`. | Model the topic–source relationship as m2m with a join table in Postgres, or move concept linkage to a graph DB (e.g. Neo4j) for richer traversal and cross-source signal merging |
+| **No vector store**                            | Topic deduplication is handled structurally (the extraction call partitions content into matched and unmatched, so the naming call can't re-propose already-covered content), but there is no persistent vector index for semantic search, nearest-neighbour retrieval, or cross-source concept clustering                                                            | Add pgvector on Supabase or a dedicated vector DB (Pinecone/Qdrant); persist one embedding per topic version for search and clustering use cases                                  |
 
 ---
 
@@ -402,6 +391,7 @@ flowchart TD
 ```
 
 **Granularity options:**
+
 - **Global daily run** — simplest; one sweep across all sources every 24 h
 - **Per-source schedule** — high-velocity sources (e.g. regulatory docs) run more frequently
 - **Per-topic watch** — individual topics flagged as high-priority get their own check interval
@@ -412,14 +402,14 @@ flowchart TD
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 15 (App Router) + TypeScript |
-| Database | Supabase Postgres via Drizzle ORM |
-| File storage | Supabase Storage (PDF uploads) |
-| LLM layer | Mastra AI agents (Ollama / OpenRouter / OpenAI) |
-| UI | shadcn/ui + Tailwind CSS 4 |
-| PDF extraction | `unpdf` (Mozilla PDF.js, no native deps) |
+| Layer          | Technology                                      |
+| -------------- | ----------------------------------------------- |
+| Framework      | Next.js 15 (App Router) + TypeScript            |
+| Database       | Supabase Postgres via Drizzle ORM               |
+| File storage   | Supabase Storage (PDF uploads)                  |
+| LLM layer      | Mastra AI agents (Ollama / OpenRouter / OpenAI) |
+| UI             | shadcn/ui + Tailwind CSS 4                      |
+| PDF extraction | `unpdf` (Mozilla PDF.js, no native deps)        |
 
 ---
 
@@ -487,6 +477,19 @@ Upload a revised version of the source document and run again:
 ### Learner view
 
 **Learner → Topics** → pick a topic → read the lesson → answer MCQ questions. Each option reveals correct/incorrect feedback and the rationale sourced from the document.
+
+---
+
+## AI Usage Record
+
+All Claude Code sessions used to build this project are in [`ai-transcripts/`](./ai-transcripts/):
+
+| File                                | Contents                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `claude-code-session-2026-06-26.md` | Full session transcript (human-readable markdown — user turns, assistant turns, tool calls) |
+| `claude-code-session-raw.zip`       | Raw Claude Code JSONL files from the session, including subagent runs                       |
+
+The primary tool used was **Claude Code** (claude-sonnet-4-6) running in the terminal with Ponytail mode active (a minimal-by-default prompt mode). No other AI tools were used.
 
 ---
 
