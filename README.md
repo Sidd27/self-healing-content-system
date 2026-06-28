@@ -48,34 +48,26 @@ cp .env.local.example .env.local
 | `OPENAI_BASE_URL` | `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1` |
 | `LLM_MODEL_NAME` | e.g. `llama3:8b` or `qwen3.5:latest` |
 | `LLM_API_KEY` | `ollama` (local) or your OpenRouter key |
-| `EMBEDDING_MODEL_NAME` | `nomic-embed-text:latest` (Ollama) or `text-embedding-3-small` (cloud) |
-| `EMBEDDING_BASE_URL` | Only needed if embeddings use a different endpoint than LLM |
 | `DEBUG_LOGS` | `true` to enable verbose pipeline logs |
 
 #### Local (Ollama)
 
 ```bash
 ollama pull llama3:8b
-ollama pull nomic-embed-text
 ```
 
 ```env
 OPENAI_BASE_URL=http://localhost:11434/v1
 LLM_MODEL_NAME=llama3:8b
 LLM_API_KEY=ollama
-EMBEDDING_MODEL_NAME=nomic-embed-text:latest
 ```
 
-#### Cloud (OpenRouter + OpenAI embeddings)
+#### Cloud (OpenRouter)
 
 ```env
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
 LLM_MODEL_NAME=meta-llama/llama-3.1-8b-instruct:free
 LLM_API_KEY=sk-or-...
-
-EMBEDDING_BASE_URL=https://api.openai.com/v1
-EMBEDDING_MODEL_NAME=text-embedding-3-small
-LLM_API_KEY=sk-...   # reuse or set EMBEDDING_API_KEY separately
 ```
 
 ### 3. Supabase storage bucket
@@ -112,15 +104,15 @@ flowchart TD
         B -->|new content| D
 
         D[Extract Topics]
-        D -->|existing topics| E[Re-extract verbatim passages\nper topic → compare hash]
-        D -->|propose new| F[LLM proposes candidates\n→ embedding cosine dedup\n→ reject similarity ≥ 0.75]
+        D -->|one call: existing topics + new source| E{Extract result}
+        E -->|drifted: true per topic| G[Drift Analysis\nLLM scores old vs new\n0.0 – 1.0]
+        E -->|drifted: false| SKIP([Skip topic —\nno change])
+        E -->|unmatched content| F[Naming call\nstructure into topics]
 
-        E -->|hash changed| G[Drift Analysis\nLLM scores old vs new\n0.0 – 1.0]
-        E -->|hash unchanged| SKIP([Skip topic —\nno change])
+        F --> APPROVE([Human Approval Queue\nproposed_topics])
 
-        F -->|surviving candidates| APPROVE([Human Approval Queue\nproposed_topics])
-
-        G --> H[Repair Decision]
+        G -->|changeType = NO_CHANGE| SKIP
+        G -->|real change confirmed| H[Repair Decision]
         H -->|drift < 0.75| I[Auto-apply\nauto_applied]
         H -->|drift ≥ 0.75| J([Human Review Queue\ndrift_items])
 
@@ -182,7 +174,6 @@ erDiagram
         uuid topic_id FK
         uuid source_version_id FK
         text extracted_content
-        text content_hash
     }
 
     drift_items {
@@ -194,6 +185,7 @@ erDiagram
         text change_type
         text reason
         enum status "auto_applied | pending_review | approved | rejected"
+        text generation_status "null | generating | failed"
     }
 
     proposed_topics {
@@ -201,7 +193,9 @@ erDiagram
         uuid pipeline_run_id FK
         text name
         text description
+        text extracted_content
         enum status "pending_approval | approved | rejected"
+        text generation_status "null | generating | failed"
     }
 
     learning_unit_versions {
@@ -248,27 +242,37 @@ Fetches the source document, normalizes whitespace and casing, computes an MD5 h
 
 ### 2 — Extract Topics
 
-Two responsibilities run sequentially:
+Two responsibilities, two LLM calls maximum:
 
-**A. Re-extract existing topics**
-For each approved topic, calls the extraction LLM (`buildExtractPrompt`) to pull verbatim passages from the new source version. Compares the MD5 hash against the previous extraction:
-- Hash unchanged → skip (no drift possible)
-- Hash changed + prior extraction exists → queue for drift analysis
-- Hash changed + no prior extraction → seed baseline, defer drift to next run
+**A. Single multi-topic extraction call**
+All existing topics (each with their latest prior extraction as baseline) and the new source document are sent in one call. The model returns:
 
-**B. Propose new topics**
-1. LLM scans the full source unconstrained and proposes candidate topics
-2. Embedding cosine similarity filters candidates against existing topics — any candidate with similarity ≥ 0.75 to an existing topic is rejected as a sub-topic or re-branding
-3. Survivors are inserted as `proposed_topics` with `pending_approval` status
+```json
+{
+  "existing": [{ "index": 1, "extractedContent": "...", "drifted": true }],
+  "unmatched": [{ "content": "..." }]
+}
+```
+
+Topics are identified to the model by a 1-based positional index (never UUID — models mangle UUIDs). Code maps index → topicId. Topics flagged `drifted: true` get a new `topicExtractions` row and flow to drift analysis. Topics with `drifted: false` are left untouched — their existing baseline stays authoritative. Topics with no prior extraction always flow through (no baseline = can't judge drift).
+
+If `sourceTopics` is empty, the extract call is skipped entirely and all content is treated as unmatched.
+
+**B. Naming call (conditional)**
+If `unmatched` is non-empty, one more call structures the leftover content into named `{ name, description, extractedContent }` objects, inserted as `proposed_topics` with `pending_approval` status.
 
 **Output:** `{ new: TopicSummary[], drifted: TopicSummary[] }`
 
+**Call budget:** `1 extract + (0 or 1 naming)`. If nothing changed and nothing is new: 1 LLM call total, down from `2N + 1` in the old per-topic loop.
+
 ### 3 — Drift Analysis
 
-For each drifted topic, the drift LLM compares old vs new extracted content and returns:
+For each topic that the extraction flagged as `drifted: true`, the drift LLM compares old vs new extracted content and returns:
 - `changeType`: `NO_CHANGE | MINOR_EDIT | SEMANTIC_CHANGE | MAJOR_RESTRUCTURE | CONTENT_REMOVED`
 - `driftScore`: 0.0–1.0
 - `reason`: one-sentence explanation
+
+**Two-layer blast-radius protection:** The extraction `drifted` flag is intentionally allowed to over-flag (cheap heuristic). The drift scorer is the precise gate: if `changeType === NO_CHANGE`, no `driftItem` is created and the topic is not regenerated. A topic only reaches Generate if both layers confirm a real change.
 
 Results are stored as `drift_items` per topic.
 
@@ -296,13 +300,17 @@ Run completion uses a transaction with `SELECT FOR UPDATE` on the pipeline run r
 
 ## Architectural Decisions & Tradeoffs
 
-### Hash-based change detection at two levels
+### Hash-based change detection at source level
 
-**Decision:** MD5 hash at source level (skip entire pipeline) and at extraction level (skip per-topic drift analysis).
+**Decision:** MD5 hash at source level gates the entire pipeline — if the normalized content hasn't changed since the last completed run, the pipeline exits immediately without any LLM calls.
 
-**Tradeoff:** Hash comparison is exact — two LLM calls on identical source text can produce slightly different verbatim excerpts, causing false-positive drift detection. The mitigation is that the drift analysis LLM is the authoritative semantic judge: a `MINOR_EDIT` with score 0.2 is auto-applied even if it was a hash false positive.
+**Tradeoff:** The hash is exact — byte-for-byte. Whitespace-only reformatting or encoding changes would trigger a full run. Mitigated by the normalization step (whitespace collapsed, casing lowered) before hashing. Per-extraction hashing was deliberately removed: LLM extraction is non-deterministic, so two calls on the same source rarely produce an identical string. The drift scorer is the semantic truth layer.
 
-The seeded extraction baseline is now generated using `buildExtractPrompt` (not the propose prompt), making baselines consistent across runs and reducing false positive rate.
+### Single multi-topic extraction call
+
+**Decision:** All existing topics and the new source are sent to the LLM in one call. The model returns extracted content per topic and a `drifted` boolean, replacing the old per-topic extract loop (`N` calls) followed by a separate drift scoring loop (another `N` calls).
+
+**Tradeoff:** A single large prompt grows with the number of topics. At 3–8 topics per source (assignment scale) this is well within context limits. If topic counts grew large, the call would need to be chunked. The invariant is documented in the code — not silently assumed.
 
 ### Append-only history tables
 
@@ -310,11 +318,11 @@ The seeded extraction baseline is now generated using `buildExtractPrompt` (not 
 
 **Tradeoff:** Storage grows unbounded. Acceptable for the current scope; a production system would add a retention policy.
 
-### Two-phase topic proposal
+### Residual-content topic proposal
 
-**Decision:** LLM proposes topics unconstrained first, then a deterministic embedding cosine filter deduplicates against existing topics (threshold 0.75). Previously, passing the existing topic list to the propose prompt caused the LLM to propose sub-topics under different names.
+**Decision:** Instead of asking the LLM to propose topics from the full source and then deduplicating against existing topics, the extraction call already partitions source content into `existing` (matched to known topics) and `unmatched` (leftover). Only unmatched content reaches the naming call — structural deduplication, no embeddings needed.
 
-**Tradeoff:** Adds embedding API calls per candidate. These are cheap relative to generation LLM calls, and the deduplication quality is far higher than prompt-based filtering. The threshold (0.75) is tunable — lower is stricter.
+**Tradeoff:** The model has to make all partition decisions in one pass. A poorly scoped topic definition could cause a relevant passage to be misrouted. In practice this is more reliable than asking the model to propose topics and then filtering — the filter was a second LLM judgement on top of the first.
 
 ### Human-in-the-loop as a first-class concept
 
@@ -334,11 +342,11 @@ The seeded extraction baseline is now generated using `buildExtractPrompt` (not 
 
 **Tradeoff:** Mastra adds a layer of indirection. If Mastra's API changes, all agents need updating. The benefit is a clean separation between agent intent and model provider.
 
-### Separate embedding provider
+### Seed approved topics from reviewed content
 
-**Decision:** Embeddings use their own provider config (`EMBEDDING_BASE_URL`, `EMBEDDING_MODEL_NAME`), independent of the LLM provider. This allows mixing OpenRouter for generation with OpenAI (or local Ollama `nomic-embed-text`) for embeddings.
+**Decision:** When a proposed topic is approved, its first `topicExtractions` row is seeded directly from `proposedTopics.extractedContent` — the exact text the human reviewed — rather than re-calling the extraction LLM on the source.
 
-**Tradeoff:** An additional env var. The flexibility matters in practice: most free-tier LLM providers do not expose an embeddings endpoint.
+**Tradeoff:** The baseline is exactly what was approved. The previous approach re-extracted from the source document, which was non-deterministic — the re-extracted text could differ slightly from the approved text, causing a spurious drift hit on the very next run.
 
 ### `tryCompleteRun` with `SELECT FOR UPDATE`
 
@@ -353,14 +361,12 @@ The seeded extraction baseline is now generated using `buildExtractPrompt` (not 
 | Limitation | Impact | Production path |
 |------------|--------|-----------------|
 | **No scheduler** | Pipeline must be triggered manually | Attach a cron scheduler; configure interval per source, topic group, or user cohort |
-| **Sequential LLM calls in Extract** | 5 topics = 5 sequential extractions; ~10 s per topic at median latency | Parallelize with `Promise.all` — straightforward refactor, held back to avoid hitting rate limits on small models |
-| **LLM non-determinism in extraction** | Same source + same topic can yield slightly different verbatim passages → hash false positives | Accept: drift analysis is the semantic truth layer and handles low-drift false positives correctly |
+| **Single extract call grows with topic count** | All existing topics + full source in one prompt; fine at 3–8 topics but gets expensive at scale | Chunk the extraction call by batches of topics, or add a retrieval pre-filter to only send relevant topics |
 | **Single source per pipeline run** | No batch trigger across all sources | Add a `POST /api/pipeline/run-all` that fans out one run per source |
 | **No auth / multi-tenancy** | All admins share the same view; all learners see all content | Add Supabase Auth with row-level security per organization |
 | **500 K character content cap** | Large documents must be split manually before ingestion | Add a chunking pre-processor that splits by section heading and indexes chunks |
-| **No generation retry UI** | A failed LLM generation during review leaves the item approved but with no learning unit — already handled server-side (item stays `pending`), but no UI affordance | Add a per-item "Retry generate" action on the pipeline run page |
 | **Topics are scoped to one source (no m2m)** | The schema is 1:many — one source has many topics, but a topic cannot span multiple sources. If "Kubernetes Autoscaling" appears in two sources, you get two separate topic rows with no shared identity, duplicate learning units, and no cross-source drift aggregation. `learning_unit_versions` has the same constraint: it pins to a single `source_version_id`. | Model the topic–source relationship as m2m with a join table in Postgres, or move concept linkage to a graph DB (e.g. Neo4j) for richer traversal and cross-source signal merging |
-| **No vector store** | Topic deduplication is handled structurally (proposer sees existing extractions so it can't re-propose covered content), but there is no persistent vector index for semantic search, nearest-neighbour retrieval, or cross-source concept clustering | Add pgvector on Supabase or a dedicated vector DB (Pinecone/Qdrant); persist one embedding per topic version for search and clustering use cases |
+| **No vector store** | Topic deduplication is handled structurally (the extraction call partitions content into matched and unmatched, so the naming call can't re-propose already-covered content), but there is no persistent vector index for semantic search, nearest-neighbour retrieval, or cross-source concept clustering | Add pgvector on Supabase or a dedicated vector DB (Pinecone/Qdrant); persist one embedding per topic version for search and clustering use cases |
 
 ---
 
@@ -399,7 +405,6 @@ flowchart TD
 | Database | Supabase Postgres via Drizzle ORM |
 | File storage | Supabase Storage (PDF uploads) |
 | LLM layer | Mastra AI agents (Ollama / OpenRouter / OpenAI) |
-| Embeddings | `nomic-embed-text` (local) or `text-embedding-3-small` (cloud) |
 | UI | shadcn/ui + Tailwind CSS 4 |
 | PDF extraction | `unpdf` (Mozilla PDF.js, no native deps) |
 
@@ -424,17 +429,18 @@ src/
 ├── pipeline/
 │   ├── run.ts                # 5-stage orchestration with branching logic
 │   ├── stage-runner.ts       # Idempotent stage wrapper + resume
+│   ├── extract-mapping.ts    # Pure helper: maps LLM index→topic, filters drifted
 │   ├── stages/
 │   │   ├── ingest.ts         # Fetch + normalize + hash check
-│   │   ├── extract-topics.ts # Re-extract existing + propose new (with embedding dedup)
-│   │   ├── drift-analysis.ts # Per-topic semantic diff
+│   │   ├── extract-topics.ts # Single multi-topic extract call + naming call for unmatched
+│   │   ├── drift-analysis.ts # Per-topic semantic diff with NO_CHANGE veto
 │   │   ├── repair-decision.ts# Threshold routing + pause logic
 │   │   └── generate.ts       # Lesson + MCQ generation
 │   └── prompts.ts            # All LLM prompt builders
 ├── db/
 │   └── schema.ts             # Drizzle table definitions + enums
 ├── lib/
-│   ├── llm.ts                # LLM + embedding model factory
+│   ├── llm.ts                # LLM model factory (provider-agnostic via env vars)
 │   ├── close-run.ts          # markGenerateRunning + tryCompleteRun (transactional)
 │   ├── utils.ts              # normalizeText, hashContent, cn
 │   └── parsers/              # HTML + PDF content extractors
