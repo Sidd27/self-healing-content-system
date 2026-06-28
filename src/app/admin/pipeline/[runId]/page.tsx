@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,6 +41,7 @@ type ProposedTopic = { id: string; name: string; description: string; status: st
 type RunDetail = {
   id: string;
   sourceId: string;
+  sourceName: string | null;
   sourceVersionId: string | null;
   triggeredAt: string;
   completedAt: string | null;
@@ -504,6 +507,19 @@ export default function PipelineRunPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/admin/sources" className="hover:text-foreground transition-colors">Sources</Link>
+        <ChevronRight className="h-3.5 w-3.5" />
+        {run.sourceName && (
+          <>
+            <Link href={`/admin/sources/${run.sourceId}`} className="hover:text-foreground transition-colors">{run.sourceName}</Link>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </>
+        )}
+        <span className="text-foreground font-medium font-mono">{run.id.slice(0, 8)}</span>
+      </nav>
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1.5">

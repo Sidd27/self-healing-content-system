@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { pipelineRuns, pipelineStages, driftItems, proposedTopics, topics } from '@/db/schema';
+import { pipelineRuns, pipelineStages, driftItems, proposedTopics, topics, sources } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ runId: string }> }) {
@@ -8,6 +8,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ runId: 
 
   const [run] = await db.select().from(pipelineRuns).where(eq(pipelineRuns.id, runId));
   if (!run) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const [source] = await db.select({ name: sources.name }).from(sources).where(eq(sources.id, run.sourceId));
 
   const stages = await db
     .select()
@@ -25,5 +27,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ runId: 
     .from(proposedTopics)
     .where(eq(proposedTopics.pipelineRunId, runId));
 
-  return NextResponse.json({ ...run, stages, driftItems: drift, proposedTopics: proposed });
+  return NextResponse.json({ ...run, sourceName: source?.name ?? null, stages, driftItems: drift, proposedTopics: proposed });
 }

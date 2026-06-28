@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Paperclip } from 'lucide-react';
+import { ChevronRight, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -96,6 +96,13 @@ export default function SourceDetailPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/admin/sources" className="hover:text-foreground transition-colors">Sources</Link>
+        <ChevronRight className="h-3.5 w-3.5" />
+        <span className="text-foreground font-medium truncate">{source.name}</span>
+      </nav>
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1.5">
