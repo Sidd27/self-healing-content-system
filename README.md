@@ -82,10 +82,10 @@ LLM_API_KEY=sk-...   # reuse or set EMBEDDING_API_KEY separately
 
 Supabase → Storage → **New bucket** → name: `source-files` → enable **Public**.
 
-### 4. Push schema
+### 4. Apply schema
 
 ```bash
-npx drizzle-kit push
+npm run db:migrate
 ```
 
 ### 5. Run
@@ -356,11 +356,10 @@ The seeded extraction baseline is now generated using `buildExtractPrompt` (not 
 | **Sequential LLM calls in Extract** | 5 topics = 5 sequential extractions; ~10 s per topic at median latency | Parallelize with `Promise.all` — straightforward refactor, held back to avoid hitting rate limits on small models |
 | **No embedding cache** | Existing topic embeddings are recomputed on every run | Cache embeddings in a `topic_embeddings` table; invalidate when topic description changes |
 | **LLM non-determinism in extraction** | Same source + same topic can yield slightly different verbatim passages → hash false positives | Accept: drift analysis is the semantic truth layer and handles low-drift false positives correctly |
-| **No generation retry UI** | A failed LLM generation during review leaves the item approved but with no learning unit | Add a per-item "Retry generate" action on the pipeline run page |
 | **Single source per pipeline run** | No batch trigger across all sources | Add a `POST /api/pipeline/run-all` that fans out one run per source |
 | **No auth / multi-tenancy** | All admins share the same view; all learners see all content | Add Supabase Auth with row-level security per organization |
 | **500 K character content cap** | Large documents must be split manually before ingestion | Add a chunking pre-processor that splits by section heading and indexes chunks |
-| **`drizzle-kit push` in dev** | Schema push does not generate migration files; unsafe for production | Switch to `drizzle-kit generate` + `migrate` for versioned, auditable schema changes |
+| **No generation retry UI** | A failed LLM generation during review leaves the item approved but with no learning unit — already handled server-side (item stays `pending`), but no UI affordance | Add a per-item "Retry generate" action on the pipeline run page |
 
 ---
 
