@@ -14,7 +14,6 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.2",
     "@base-ui/react": "^1.6.0",
     "@mastra/core": "^1.47.0",
     "@openrouter/ai-sdk-provider": "^2.10.0",
