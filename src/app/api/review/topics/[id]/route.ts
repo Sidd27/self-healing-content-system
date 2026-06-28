@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { proposedTopics, topics, pipelineRuns, topicExtractions, sourceVersions } from '@/db/schema';
+import { proposedTopics, topics, pipelineRuns, topicExtractions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { generateForTopic } from '@/pipeline/stages/generate';
 import { normalizeText } from '@/lib/utils';
 import { markGenerateRunning, tryCompleteRun } from '@/lib/close-run';
-import { extractionAgent } from '@/mastra';
-import { buildExtractPrompt } from '@/pipeline/prompts';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -43,29 +41,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         .returning();
     }
 
-    // Seed extraction using buildExtractPrompt so the baseline is consistent with
-    // every future extract-topics comparison (only seed if not already seeded).
-    const [version] = await db
-      .select({ normalizedContent: sourceVersions.normalizedContent })
-      .from(sourceVersions)
-      .where(eq(sourceVersions.id, proposed.sourceVersionId));
-    if (!version) throw new Error(`Source version ${proposed.sourceVersionId} not found`);
-
+    // Seed extraction from the already-approved content (only seed if not already seeded).
     const [existingExtraction] = await db
       .select({ id: topicExtractions.id })
       .from(topicExtractions)
       .where(eq(topicExtractions.topicId, topic.id));
     if (!existingExtraction) {
-      const rawExtracted = (
-        await extractionAgent.generate(
-          buildExtractPrompt(proposed.name, proposed.description, version.normalizedContent)
-        )
-      ).text;
-      const normalized = normalizeText(rawExtracted);
       await db.insert(topicExtractions).values({
         topicId: topic.id,
         sourceVersionId: proposed.sourceVersionId,
-        extractedContent: normalized,
+        extractedContent: normalizeText(proposed.extractedContent),
       });
     }
 
