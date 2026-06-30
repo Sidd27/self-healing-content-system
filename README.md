@@ -1,5 +1,7 @@
 # Self-Healing Content System
 
+🔗 **Live deployment:** [self-healing-content-system-eight.vercel.app](https://self-healing-content-system-eight.vercel.app/admin/sources)
+
 An AI-powered pipeline that keeps learning content accurate as source materials evolve. When a source document changes, the system detects what shifted semantically, scores the magnitude of change per topic, and either regenerates content automatically or routes it to a human reviewer — without discarding history.
 
 > **Scheduler note:** This implementation is manually triggered — there is no scheduler attached. This is intentional for the assignment context. In a production system, the pipeline would be driven by a scheduler: a global daily run across all sources, or granular schedules configured per source, topic, or even per-user cohort based on content freshness requirements.
